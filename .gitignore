@@ -1,3 +1,11 @@
+# Manually created files
+service.sh
+start.sh
+test.sh
+
+# Pip installation artifacts (version files created by shell redirection issues)
+=*.*.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
