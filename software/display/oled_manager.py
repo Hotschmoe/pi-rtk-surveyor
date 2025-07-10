@@ -40,11 +40,11 @@ class OLEDManager:
         self.width = 128
         self.height = 64
         
+        # Set up logging first (needed by _init_display)
+        self.logger = logging.getLogger(__name__)
+        
         # Initialize display
         self._init_display()
-        
-        # Set up logging
-        self.logger = logging.getLogger(__name__)
         
     def _init_display(self):
         """Initialize the physical OLED display"""

@@ -12,9 +12,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_DIR="/home/pi/pi-rtk-surveyor"
+PROJECT_DIR="$(pwd)"
 SERVICE_NAME="pi-rtk-surveyor"
-USER="pi"
+USER="$(whoami)"
 
 echo -e "${BLUE}================================================${NC}"
 echo -e "${BLUE}  Pi RTK Surveyor Installation Script${NC}"
@@ -23,7 +23,7 @@ echo -e "${BLUE}================================================${NC}"
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
    echo -e "${RED}Error: This script should not be run as root${NC}"
-   echo "Please run as the 'pi' user:"
+   echo "Please run as your regular user:"
    echo "  bash install/setup.sh"
    exit 1
 fi
@@ -57,7 +57,7 @@ sudo apt install -y \
     libfreetype6-dev \
     liblcms2-dev \
     libopenjp2-7 \
-    libtiff5
+    libtiff6
 
 echo -e "${GREEN}Step 3: Enabling SPI and I2C interfaces...${NC}"
 # Enable SPI and I2C in /boot/config.txt if not already enabled
@@ -77,15 +77,44 @@ mkdir -p "${PROJECT_DIR}/data/surveys"
 mkdir -p "${PROJECT_DIR}/data/config"
 
 echo -e "${GREEN}Step 5: Installing Python dependencies...${NC}"
-# Install Python packages
-pip3 install --user -r "${PROJECT_DIR}/install/requirements.txt"
+
+# Install available packages via apt (system packages)
+echo "Installing system Python packages..."
+sudo apt install -y \
+    python3-pil \
+    python3-psutil \
+    python3-yaml \
+    python3-serial \
+    python3-flask \
+    python3-pytest \
+    python3-gpiozero \
+    python3-rpi.gpio \
+    python3-full
+
+# Create virtual environment for packages not available in apt
+echo "Creating virtual environment for remaining packages..."
+python3 -m venv "${PROJECT_DIR}/venv"
+
+# Install remaining packages in virtual environment
+echo "Installing packages in virtual environment..."
+"${PROJECT_DIR}/venv/bin/pip" install \
+    luma.oled>=3.12.0 \
+    configparser>=5.3.0 \
+    colorlog>=6.7.0 \
+    pynmea2>=1.19.0 \
+    flask-cors>=4.0.0 \
+    python-wifi>=0.6.1
 
 echo -e "${GREEN}Step 6: Setting up systemd service...${NC}"
-# Copy service file to systemd directory
-sudo cp "${PROJECT_DIR}/install/systemd/${SERVICE_NAME}.service" "/etc/systemd/system/"
+# Copy service file to systemd directory and replace placeholders
+cp "${PROJECT_DIR}/install/systemd/${SERVICE_NAME}.service" "/tmp/${SERVICE_NAME}.service"
 
-# Update service file with correct paths (in case project is in different location)
-sudo sed -i "s|/home/pi/pi-rtk-surveyor|${PROJECT_DIR}|g" "/etc/systemd/system/${SERVICE_NAME}.service"
+# Replace placeholders with actual values
+sed -i "s|PLACEHOLDER_USER|${USER}|g" "/tmp/${SERVICE_NAME}.service"
+sed -i "s|PLACEHOLDER_PROJECT_DIR|${PROJECT_DIR}|g" "/tmp/${SERVICE_NAME}.service"
+
+# Copy to systemd directory
+sudo mv "/tmp/${SERVICE_NAME}.service" "/etc/systemd/system/"
 
 # Reload systemd and enable service
 sudo systemctl daemon-reload
@@ -97,24 +126,24 @@ chmod +x "${PROJECT_DIR}/software/main.py"
 chmod +x "${PROJECT_DIR}/install/setup.sh"
 
 # Add user to necessary groups
-sudo usermod -a -G spi,i2c,gpio pi
+sudo usermod -a -G spi,i2c,gpio $USER
 
 echo -e "${GREEN}Step 8: Creating helper scripts...${NC}"
 
 # Create start script
-cat > "${PROJECT_DIR}/start.sh" << 'EOF'
+cat > "${PROJECT_DIR}/start.sh" << EOF
 #!/bin/bash
 # Start Pi RTK Surveyor manually
-cd /home/pi/pi-rtk-surveyor/software
-python3 main.py
+cd ${PROJECT_DIR}/software
+${PROJECT_DIR}/venv/bin/python main.py
 EOF
 
 # Create test script
-cat > "${PROJECT_DIR}/test.sh" << 'EOF'
+cat > "${PROJECT_DIR}/test.sh" << EOF
 #!/bin/bash
 # Test Pi RTK Surveyor in simulation mode
-cd /home/pi/pi-rtk-surveyor/software
-python3 main.py --simulate --debug
+cd ${PROJECT_DIR}/software
+${PROJECT_DIR}/venv/bin/python main.py --simulate --debug
 EOF
 
 # Create service management script
@@ -163,7 +192,7 @@ chmod +x "${PROJECT_DIR}/service.sh"
 echo -e "${GREEN}Step 9: Testing installation...${NC}"
 echo "Running quick test..."
 cd "${PROJECT_DIR}/software"
-timeout 10s python3 main.py --simulate || true
+timeout 10s "${PROJECT_DIR}/venv/bin/python" main.py --simulate || true
 
 echo -e "${BLUE}================================================${NC}"
 echo -e "${GREEN}✅ Installation completed successfully!${NC}"

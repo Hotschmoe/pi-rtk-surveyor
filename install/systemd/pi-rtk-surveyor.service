@@ -6,17 +6,17 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/pi-rtk-surveyor/software
-ExecStart=/usr/bin/python3 /home/pi/pi-rtk-surveyor/software/main.py
+User=PLACEHOLDER_USER
+Group=PLACEHOLDER_USER
+WorkingDirectory=PLACEHOLDER_PROJECT_DIR/software
+ExecStart=PLACEHOLDER_PROJECT_DIR/venv/bin/python PLACEHOLDER_PROJECT_DIR/software/main.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
 # Environment variables
-Environment=PYTHONPATH=/home/pi/pi-rtk-surveyor/software
+Environment=PYTHONPATH=PLACEHOLDER_PROJECT_DIR/software
 Environment=PYTHONUNBUFFERED=1
 
 # Security settings
@@ -24,7 +24,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=false
 ProtectSystem=strict
-ReadWritePaths=/home/pi/pi-rtk-surveyor/data
+ReadWritePaths=PLACEHOLDER_PROJECT_DIR/data
 
 # Resource limits
 MemoryLimit=512M
