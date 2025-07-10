@@ -60,16 +60,14 @@ sudo apt install -y \
     libtiff6
 
 echo -e "${GREEN}Step 3: Enabling SPI and I2C interfaces...${NC}"
-# Enable SPI and I2C in /boot/config.txt if not already enabled
-if ! grep -q "^dtparam=spi=on" /boot/config.txt; then
-    echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
-    echo "SPI enabled in /boot/config.txt"
-fi
-
-if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt; then
-    echo "dtparam=i2c_arm=on" | sudo tee -a /boot/config.txt
-    echo "I2C enabled in /boot/config.txt"
-fi
+echo "SPI and I2C must be enabled for the OLED display to work."
+echo "Please run the following command after installation:"
+echo -e "${BLUE}sudo raspi-config${NC}"
+echo "Navigate to: Interface Options > SPI > Enable"
+echo "Navigate to: Interface Options > I2C > Enable"
+echo "Then reboot when prompted."
+echo
+echo -e "${YELLOW}Note: The installation will continue, but hardware won't work until you enable SPI/I2C.${NC}"
 
 echo -e "${GREEN}Step 4: Creating project directories...${NC}"
 mkdir -p "${PROJECT_DIR}/data/logs"
@@ -199,10 +197,14 @@ echo -e "${GREEN}✅ Installation completed successfully!${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo
 echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Reboot your Raspberry Pi to enable SPI/I2C:"
-echo -e "   ${BLUE}sudo reboot${NC}"
+echo "1. Enable SPI and I2C interfaces:"
+echo -e "   ${BLUE}sudo raspi-config${NC}"
+echo "   Interface Options > SPI > Enable"
+echo "   Interface Options > I2C > Enable"
 echo
-echo "2. After reboot, the service will start automatically"
+echo "2. Reboot when prompted by raspi-config"
+echo
+echo "3. After reboot, the service will start automatically with hardware support"
 echo
 echo -e "${YELLOW}Manual control:${NC}"
 echo "• Test in simulation mode:"
