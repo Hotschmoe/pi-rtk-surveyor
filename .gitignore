@@ -3,6 +3,9 @@ service.sh
 start.sh
 test.sh
 
+# Survey Data
+data/
+
 # Pip installation artifacts (version files created by shell redirection issues)
 =*.*.*
 
