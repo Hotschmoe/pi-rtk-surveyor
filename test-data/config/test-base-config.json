@@ -1,0 +1,35 @@
+{
+    "device_id": "TEST-BASE-001",
+    "mode": "base_station",
+    "gps": {
+        "mock_data_file": "test-data/gps-samples/rtk-fixed.nmea",
+        "update_rate": 1.0,
+        "mock_coordinates": {
+            "latitude": 40.205761,
+            "longitude": -74.020576,
+            "elevation": 45.2
+        }
+    },
+    "wifi": {
+        "ssid": "TEST-RTK-BASE",
+        "password": "test12345",
+        "channel": 6
+    },
+    "rtk": {
+        "base_position_accuracy": 0.02,
+        "correction_interval": 1.0,
+        "rtcm_version": "3.3"
+    },
+    "display": {
+        "brightness": 200,
+        "contrast": 128,
+        "timeout": 300,
+        "default_screen": "base_status"
+    },
+    "logging": {
+        "level": "DEBUG",
+        "log_gps_raw": true,
+        "log_rtk_corrections": true,
+        "max_log_files": 5
+    }
+} 

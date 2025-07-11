@@ -1,0 +1,40 @@
+{
+    "device_id": "TEST-ROVER-001",
+    "mode": "rover",
+    "gps": {
+        "mock_data_file": "test-data/gps-samples/moving-rover.nmea",
+        "update_rate": 1.0,
+        "mock_coordinates": {
+            "latitude": 40.205761,
+            "longitude": -74.020576,
+            "elevation": 45.2
+        }
+    },
+    "wifi": {
+        "base_station_ssid": "TEST-RTK-BASE",
+        "base_station_password": "test12345",
+        "connection_timeout": 30
+    },
+    "rtk": {
+        "correction_timeout": 5.0,
+        "accuracy_threshold": 0.05,
+        "fix_timeout": 60
+    },
+    "survey": {
+        "auto_point_capture": false,
+        "point_capture_delay": 2.0,
+        "accuracy_requirement": 0.10
+    },
+    "display": {
+        "brightness": 255,
+        "contrast": 128,
+        "timeout": 60,
+        "default_screen": "rover_status"
+    },
+    "logging": {
+        "level": "INFO",
+        "log_survey_points": true,
+        "log_gps_raw": false,
+        "max_log_files": 10
+    }
+} 
