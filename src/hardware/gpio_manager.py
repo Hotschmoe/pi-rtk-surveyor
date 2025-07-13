@@ -38,10 +38,10 @@ class GPIOManager:
         1: "3.3V", 2: "5V", 4: "5V", 6: "GND", 9: "GND", 14: "GND",
         17: "3.3V", 20: "GND", 25: "GND", 30: "GND", 34: "GND", 39: "GND",
         
-        # I2C pins (if enabled)
+        # I2C pins (if enabled) - but allow override for HAT usage
         3: "I2C1_SDA", 5: "I2C1_SCL",
         
-        # SPI pins (if enabled)
+        # SPI pins (if enabled) - but allow override for HAT usage
         19: "SPI0_MOSI", 21: "SPI0_MISO", 23: "SPI0_SCLK", 24: "SPI0_CE0", 26: "SPI0_CE1",
         
         # UART pins (if enabled)
@@ -145,13 +145,17 @@ class GPIOManager:
                     self.logger.debug(f"Pin {pin} already allocated to '{component_name}'")
                     return True
             
-            # Check against reserved pins
+            # Check against reserved pins, but allow button manager to override
             if pin in self.RESERVED_PINS:
                 reserved_for = self.RESERVED_PINS[pin]
                 if mode == PinMode.SPI and "SPI" in reserved_for:
                     pass  # SPI pins can be used for SPI
                 elif mode == PinMode.I2C and "I2C" in reserved_for:
                     pass  # I2C pins can be used for I2C
+                elif component_name == "button_manager" and pin in self.BUTTON_PINS:
+                    # Allow button manager to override reserved status for button pins
+                    self.logger.debug(f"Pin {pin} reserved for {reserved_for} but allowing button override")
+                    pass
                 else:
                     self.logger.warning(f"Pin {pin} is reserved for {reserved_for} but requested for {mode.value}")
             
@@ -255,8 +259,21 @@ class GPIOManager:
                 # Remove existing interrupt if any
                 try:
                     GPIO.remove_event_detect(pin)
-                except RuntimeError:
-                    pass  # No existing interrupt
+                    self.logger.debug(f"Removed existing event detection for pin {pin}")
+                except RuntimeError as e:
+                    self.logger.debug(f"No existing event detection for pin {pin}: {e}")
+                
+                # Small delay to ensure cleanup
+                import time
+                time.sleep(0.001)
+                
+                # Verify pin is properly configured as input
+                try:
+                    current_state = GPIO.input(pin)
+                    self.logger.debug(f"Pin {pin} current state: {current_state}")
+                except Exception as e:
+                    self.logger.error(f"Cannot read pin {pin}, may not be configured as input: {e}")
+                    return False
                 
                 # Set up new interrupt
                 edge_map = {
@@ -265,15 +282,21 @@ class GPIOManager:
                     "BOTH": GPIO.BOTH
                 }
                 
+                if edge not in edge_map:
+                    self.logger.error(f"Invalid edge type: {edge}")
+                    return False
+                
+                self.logger.debug(f"Setting up interrupt for pin {pin} with edge {edge}, bouncetime {bouncetime}")
                 GPIO.add_event_detect(pin, edge_map[edge], 
                                     callback=callback, bouncetime=bouncetime)
                 
                 self.pin_callbacks[pin] = callback
-                self.logger.debug(f"Interrupt setup for pin {pin} ({edge})")
+                self.logger.debug(f"Interrupt setup successful for pin {pin}")
                 return True
                 
             except Exception as e:
                 self.logger.error(f"Failed to setup interrupt for pin {pin}: {e}")
+                self.logger.debug(f"Exception type: {type(e).__name__}")
                 return False
     
     def read_pin(self, pin: int) -> Optional[bool]:
