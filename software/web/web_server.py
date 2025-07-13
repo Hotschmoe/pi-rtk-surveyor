@@ -4,6 +4,8 @@ Flask Web Server for Pi RTK Surveyor Base Station
 Provides real-time monitoring, configuration, and data visualization
 """
 
+import os
+import sys
 import json
 import time
 import threading
@@ -12,16 +14,20 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import logging
 
+# Add software directory to Python path
+software_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(software_dir))
+
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 
 # Import RTK Surveyor modules
-from ..gnss.lc29h_controller import LC29HController, GNSSPosition, FixType
-from ..monitoring.system_monitor import SystemMonitor
+from gnss.lc29h_controller import LC29HController, GNSSPosition, FixType
+from monitoring.system_monitor import SystemMonitor
 
 # Optional imports
 try:
-    from ..monitoring.battery_monitor import BatteryMonitor
+    from monitoring.battery_monitor import BatteryMonitor
 except ImportError:
     BatteryMonitor = type(None)
 
@@ -362,8 +368,8 @@ class RTKWebServer:
 # Standalone usage for development/testing
 if __name__ == '__main__':
     # Initialize with mock components for testing
-    from ..gnss.lc29h_controller import LC29HController
-    from ..monitoring.system_monitor import SystemMonitor
+    from gnss.lc29h_controller import LC29HController
+    from monitoring.system_monitor import SystemMonitor
     
     gps = LC29HController(simulate=True)
     system_mon = SystemMonitor()

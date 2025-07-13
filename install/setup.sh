@@ -202,13 +202,8 @@ cat > "${PROJECT_DIR}/run_web_server.sh" << 'EOF'
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
-echo "Starting Pi RTK Surveyor Web Server..."
-echo "Web interface will be available at: http://localhost:5000"
-echo "Press Ctrl+C to stop"
-
-# Start web server
-cd "${PROJECT_DIR}/software"
-PYTHONPATH="${PROJECT_DIR}/software" "${PROJECT_DIR}/venv/bin/python" "${PROJECT_DIR}/software/web/web_server.py"
+# Start web server using the launcher script
+"${PROJECT_DIR}/venv/bin/python" "${PROJECT_DIR}/run_web_server.py"
 EOF
 
 # Create service management script
