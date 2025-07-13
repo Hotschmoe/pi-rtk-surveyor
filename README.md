@@ -155,6 +155,23 @@ pi-rtk-surveyor/
 - **Engineers** - Site assessment and planning
 - **Researchers** - Academic/scientific surveying projects
 
+## 🧪 Development Philosophy
+
+**This project is hardware-focused and designed for real-world testing.** We deliberately avoid simulation modes and fake testing because:
+
+- **Real hardware behavior** is what matters for field surveying
+- **Simulation can mask** hardware-specific issues and timing problems
+- **Field reliability** requires testing with actual GPS modules, displays, and buttons
+- **User experience** should be validated with the intended hardware setup
+
+**Testing approach:**
+- All development and testing should be done on actual Raspberry Pi hardware
+- Use real GPIO pins, SPI/I2C interfaces, and physical components
+- Test in actual field conditions when possible
+- Hardware failures should produce clear error messages, not fallback to simulation
+
+This ensures the surveyor works reliably when you need it most - in the field.
+
 ## 🤝 Contributing
 
 We welcome contributions! Here's how to help:
