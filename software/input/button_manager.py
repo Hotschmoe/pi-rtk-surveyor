@@ -56,8 +56,21 @@ class ButtonManager:
         Args:
             simulate_buttons: If True, uses keyboard simulation instead of GPIO
         """
-        self.simulate_buttons = simulate_buttons or not GPIO_AVAILABLE
         self.logger = logging.getLogger(__name__)
+        
+        # Check GPIO availability
+        gpio_available = GPIO_AVAILABLE
+        self.logger.info(f"GPIO availability check: {gpio_available}")
+        
+        # Override simulation if explicitly requested or if GPIO not available
+        self.simulate_buttons = simulate_buttons or not gpio_available
+        
+        if simulate_buttons and gpio_available:
+            self.logger.info("Hardware GPIO available but simulation mode requested")
+        elif not gpio_available:
+            self.logger.warning("GPIO not available - forced to simulation mode")
+        else:
+            self.logger.info("Hardware GPIO mode enabled")
         
         # Button state tracking
         self.button_states = {}
@@ -252,31 +265,20 @@ class ButtonManager:
         if not self.simulate_buttons:
             return
             
-        self.logger.info("Keyboard simulation active. Press keys: k, j, l, w, a, s, d, space")
-        self.logger.info("Press 'q' to stop button monitoring")
+        self.logger.info("Keyboard simulation ready. Use external triggers for button events.")
+        self.logger.info("Button simulation is disabled in production mode.")
         
-        try:
-            # For Windows, we'll use a simpler approach
-            # In a real scenario on Pi, we'd use proper keyboard input
-            while self.running:
-                try:
-                    # Simulate some button presses for testing
-                    time.sleep(2)
-                    self._simulate_button_press(ButtonType.KEY1)
-                    time.sleep(1)
-                    self._simulate_button_press(ButtonType.KEY2)
-                    time.sleep(1)
-                    self._simulate_button_press(ButtonType.JOY_UP)
-                    time.sleep(2)
-                    
-                    if not self.running:
-                        break
-                        
-                except KeyboardInterrupt:
+        # Keep thread alive but don't automatically press buttons
+        while self.running:
+            try:
+                time.sleep(1)
+                if not self.running:
                     break
+                        
+            except KeyboardInterrupt:
+                break
                     
-        except Exception as e:
-            self.logger.error(f"Keyboard monitor error: {e}")
+        self.logger.info("Keyboard monitor stopped")
     
     def _simulate_button_press(self, button: ButtonType):
         """Simulate a button press for testing"""
