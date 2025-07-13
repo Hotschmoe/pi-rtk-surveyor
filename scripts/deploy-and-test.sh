@@ -68,6 +68,20 @@ test_buttons() {
     python3 test_physical_buttons.py
 }
 
+# Function to run GPIO diagnostic
+gpio_diagnostic() {
+    echo "Running GPIO pin diagnostic..."
+    echo "This will test each GPIO pin individually"
+    echo "Press Ctrl+C to stop the test"
+    echo ""
+    
+    # Make sure the diagnostic script is executable
+    chmod +x debug_gpio_pins.py
+    
+    # Run the GPIO diagnostic
+    python3 debug_gpio_pins.py
+}
+
 # Function to run main app without service
 run_main_app() {
     echo "Running main application in hardware mode..."
@@ -96,13 +110,14 @@ show_menu() {
     echo "Choose an option:"
     echo "1. Test GPIO availability"
     echo "2. Test physical buttons (dedicated test)"
-    echo "3. Run main app directly (hardware mode)"
-    echo "4. Stop service"
-    echo "5. Start service"
-    echo "6. Check service logs"
-    echo "7. Exit"
+    echo "3. GPIO pin diagnostic (individual pin test)"
+    echo "4. Run main app directly (hardware mode)"
+    echo "5. Stop service"
+    echo "6. Start service"
+    echo "7. Check service logs"
+    echo "8. Exit"
     echo ""
-    read -p "Enter your choice (1-7): " choice
+    read -p "Enter your choice (1-8): " choice
 }
 
 # Main loop
@@ -123,23 +138,27 @@ while true; do
             ;;
         3)
             stop_service
-            run_main_app
+            gpio_diagnostic
             ;;
         4)
             stop_service
+            run_main_app
             ;;
         5)
-            start_service
+            stop_service
             ;;
         6)
-            check_logs
+            start_service
             ;;
         7)
+            check_logs
+            ;;
+        8)
             echo "Exiting..."
             exit 0
             ;;
         *)
-            echo "Invalid option. Please choose 1-7."
+            echo "Invalid option. Please choose 1-8."
             ;;
     esac
     

@@ -113,20 +113,38 @@ class ButtonManager:
                 self.button_press_times[button] = 0
         else:
             try:
+                # Clean up any existing GPIO state
+                try:
+                    GPIO.cleanup()
+                except:
+                    pass
+                
                 # Set up GPIO
                 GPIO.setmode(GPIO.BCM)
                 GPIO.setwarnings(False)
                 
                 # Configure button pins
                 for button, pin in self.BUTTON_PINS.items():
+                    try:
+                        # Remove any existing event detection
+                        GPIO.remove_event_detect(pin)
+                    except:
+                        pass
+                    
+                    # Set up the pin
                     GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
                     self.button_states[button] = False
                     self.button_press_times[button] = 0
                     
-                    # Set up interrupt for button press
+                    # Set up interrupt for button press (fix lambda closure issue)
+                    def make_callback(btn):
+                        return lambda pin_num: self._gpio_callback(btn)
+                    
                     GPIO.add_event_detect(pin, GPIO.BOTH, 
-                                        callback=lambda pin, btn=button: self._gpio_callback(btn),
+                                        callback=make_callback(button),
                                         bouncetime=int(self.debounce_time * 1000))
+                    
+                    self.logger.debug(f"GPIO pin {pin} configured for {button.value}")
                 
                 self.logger.info("Button manager initialized with GPIO hardware")
                 

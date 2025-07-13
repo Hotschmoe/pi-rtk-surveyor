@@ -7,6 +7,7 @@ Tests the physical buttons on the Pi RTK Surveyor hardware
 import sys
 import time
 import logging
+import subprocess
 from pathlib import Path
 
 # Add software directory to Python path
@@ -14,6 +15,23 @@ software_dir = Path(__file__).parent / "software"
 sys.path.insert(0, str(software_dir))
 
 from software.input.button_manager import ButtonManager, ButtonType, ButtonEvent
+
+def check_service_status():
+    """Check if the pi-rtk-surveyor service is running"""
+    try:
+        result = subprocess.run(['systemctl', 'is-active', 'pi-rtk-surveyor.service'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip() == 'active':
+            print("⚠️  WARNING: pi-rtk-surveyor service is running!")
+            print("   This may cause GPIO conflicts. Consider stopping it with:")
+            print("   sudo systemctl stop pi-rtk-surveyor.service")
+            return True
+        else:
+            print("✓ pi-rtk-surveyor service is not running")
+            return False
+    except Exception as e:
+        print(f"Could not check service status: {e}")
+        return False
 
 def test_physical_buttons():
     """Test physical button functionality"""
@@ -44,6 +62,14 @@ def test_physical_buttons():
     # Start button monitoring
     print("Starting button monitoring...")
     button_manager.start()
+    
+    # Check if still in simulation mode
+    if button_manager.simulate_buttons:
+        print("❌ Button manager is in simulation mode - hardware buttons won't work")
+        print("   Check the error messages above for details")
+        return False
+    else:
+        print("✓ Button manager is in hardware mode")
     
     print("\nButton test ready!")
     print("Hardware buttons to test:")
@@ -76,6 +102,8 @@ def test_physical_buttons():
     finally:
         button_manager.stop()
         print("Button test complete!")
+    
+    return True
 
 def check_gpio_status():
     """Check GPIO availability and status"""
@@ -95,6 +123,14 @@ def check_gpio_status():
         initial_state = GPIO.input(test_pin)
         print(f"✓ GPIO {test_pin} (KEY1) initial state: {initial_state}")
         
+        # Test edge detection setup
+        try:
+            GPIO.add_event_detect(test_pin, GPIO.BOTH, bouncetime=50)
+            print("✓ Edge detection test successful")
+            GPIO.remove_event_detect(test_pin)
+        except Exception as e:
+            print(f"✗ Edge detection test failed: {e}")
+        
         GPIO.cleanup()
         print("✓ GPIO cleanup successful")
         
@@ -111,11 +147,26 @@ if __name__ == "__main__":
     print("Pi RTK Surveyor - Button Hardware Test")
     print("=" * 45)
     
+    # Check if service is running
+    service_running = check_service_status()
+    print()
+    
     # Check GPIO first
     if check_gpio_status():
         print("\nGPIO hardware check passed!")
+        if service_running:
+            print("WARNING: Service is running - this may cause issues")
+            response = input("Continue anyway? (y/N): ")
+            if response.lower() != 'y':
+                print("Stopping. Please stop the service first.")
+                sys.exit(1)
+        
         print("Starting physical button test...\n")
-        test_physical_buttons()
+        if test_physical_buttons():
+            print("Button test completed successfully!")
+        else:
+            print("Button test failed!")
+            sys.exit(1)
     else:
         print("\nGPIO hardware check failed!")
         print("Cannot test physical buttons without GPIO support")
