@@ -153,10 +153,11 @@ class GPIOManager:
                 elif mode == PinMode.I2C and "I2C" in reserved_for:
                     pass  # I2C pins can be used for I2C
                 else:
-                    self.logger.warning(f"Pin {pin} is reserved for {reserved_for}")
+                    self.logger.warning(f"Pin {pin} is reserved for {reserved_for} but requested for {mode.value}")
             
             # Configure the pin
             if not self._configure_pin(pin, mode, pull):
+                self.logger.error(f"Failed to configure pin {pin} for mode {mode.value}")
                 return False
             
             # Allocate the pin
@@ -195,19 +196,25 @@ class GPIOManager:
         success = True
         allocated_pins = []
         
+        self.logger.info(f"Requesting button pins for component '{component_name}'")
         for pin, description in self.BUTTON_PINS.items():
+            self.logger.debug(f"Attempting to allocate pin {pin} for {description}")
             if self.request_pin(pin, component_name, PinMode.INPUT, PinPull.UP, description):
                 allocated_pins.append(pin)
+                self.logger.debug(f"Successfully allocated pin {pin} for {description}")
             else:
+                self.logger.error(f"Failed to allocate pin {pin} for {description}")
                 success = False
                 break
         
         if not success:
+            self.logger.error(f"Button pin allocation failed for '{component_name}', cleaning up...")
             # Clean up any pins that were allocated
             for pin in allocated_pins:
                 self.release_pin(pin, component_name)
             return False
         
+        self.logger.info(f"All button pins successfully allocated for '{component_name}'")
         return True
     
     def request_oled_pins(self, component_name: str) -> bool:
@@ -289,6 +296,8 @@ class GPIOManager:
     def _configure_pin(self, pin: int, mode: PinMode, pull: PinPull) -> bool:
         """Configure a GPIO pin"""
         try:
+            self.logger.debug(f"Configuring pin {pin} as {mode.value} with pull {pull.value}")
+            
             if mode == PinMode.INPUT:
                 pull_map = {
                     PinPull.NONE: GPIO.PUD_OFF,
@@ -296,13 +305,16 @@ class GPIOManager:
                     PinPull.DOWN: GPIO.PUD_DOWN
                 }
                 GPIO.setup(pin, GPIO.IN, pull_up_down=pull_map[pull])
+                self.logger.debug(f"Pin {pin} configured as INPUT with pull {pull.value}")
                 
             elif mode == PinMode.OUTPUT:
                 GPIO.setup(pin, GPIO.OUT)
+                self.logger.debug(f"Pin {pin} configured as OUTPUT")
                 
             elif mode in [PinMode.SPI, PinMode.I2C, PinMode.UART]:
                 # These are handled by their respective libraries
                 # We just track them for conflict detection
+                self.logger.debug(f"Pin {pin} marked as {mode.value} (managed by library)")
                 pass
                 
             return True
