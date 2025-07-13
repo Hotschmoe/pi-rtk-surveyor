@@ -48,6 +48,7 @@ sudo apt install -y \
     python3 \
     python3-pip \
     python3-venv \
+    python3-full \
     git \
     i2c-tools \
     spi-tools \
@@ -76,33 +77,35 @@ mkdir -p "${PROJECT_DIR}/data/config"
 
 echo -e "${GREEN}Step 5: Installing Python dependencies...${NC}"
 
-# Install available packages via apt (system packages)
-echo "Installing system Python packages..."
+# Install additional system dependencies for Python packages
+echo "Installing additional system dependencies for Python packages..."
 sudo apt install -y \
-    python3-pil \
-    python3-psutil \
-    python3-yaml \
-    python3-serial \
-    python3-flask \
-    python3-pytest \
-    python3-gpiozero \
-    python3-rpi.gpio \
-    python3-full
+    libgpiod2 \
+    libgpiod-dev
 
-# Create virtual environment for packages not available in apt
-echo "Creating virtual environment for remaining packages..."
+# Create virtual environment for all Python packages
+echo "Creating virtual environment for Python packages..."
 python3 -m venv "${PROJECT_DIR}/venv"
 
-# Install remaining packages in virtual environment
-echo "Installing packages in virtual environment..."
+# Install all packages in virtual environment
+echo "Installing all Python packages in virtual environment..."
+"${PROJECT_DIR}/venv/bin/pip" install --upgrade pip
 "${PROJECT_DIR}/venv/bin/pip" install \
-    luma.oled>=3.12.0 \
-    configparser>=5.3.0 \
-    colorlog>=6.7.0 \
-    pynmea2>=1.19.0 \
-    flask-cors>=4.0.0 \
-    flask-socketio>=5.3.0 \
-    python-wifi>=0.6.1
+    "pillow>=9.0.0" \
+    "psutil>=5.8.0" \
+    "pyyaml>=6.0" \
+    "pyserial>=3.5" \
+    "flask>=2.0.0" \
+    "flask-cors>=4.0.0" \
+    "flask-socketio>=5.3.0" \
+    "pytest>=7.0.0" \
+    "gpiozero>=1.6.0" \
+    "rpi.gpio>=0.7.0" \
+    "luma.oled>=3.12.0" \
+    "configparser>=5.3.0" \
+    "colorlog>=6.7.0" \
+    "pynmea2>=1.19.0" \
+    "python-wifi>=0.6.1"
 
 echo -e "${GREEN}Step 6: Setting up systemd service...${NC}"
 # Copy service file to systemd directory and replace placeholders
