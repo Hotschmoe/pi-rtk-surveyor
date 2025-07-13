@@ -10,12 +10,7 @@ from typing import Dict, List, Callable, Optional
 from enum import Enum
 import logging
 
-try:
-    import RPi.GPIO as GPIO
-    GPIO_AVAILABLE = True
-except ImportError:
-    GPIO_AVAILABLE = False
-    logging.warning("RPi.GPIO not available - using simulation mode")
+from .gpio_manager import get_gpio_manager, PinMode, PinPull
 
 class ButtonEvent(Enum):
     """Button event types"""
@@ -49,28 +44,15 @@ class ButtonManager:
         ButtonType.JOY_PRESS: 13
     }
     
-    def __init__(self, simulate_buttons: bool = False):
-        """
-        Initialize button manager
-        
-        Args:
-            simulate_buttons: If True, uses keyboard simulation instead of GPIO
-        """
+    def __init__(self):
+        """Initialize button manager"""
         self.logger = logging.getLogger(__name__)
         
-        # Check GPIO availability
-        gpio_available = GPIO_AVAILABLE
-        self.logger.info(f"GPIO availability check: {gpio_available}")
+        # Get GPIO manager instance
+        self.gpio_manager = get_gpio_manager()
         
-        # Override simulation if explicitly requested or if GPIO not available
-        self.simulate_buttons = simulate_buttons or not gpio_available
-        
-        if simulate_buttons and gpio_available:
-            self.logger.info("Hardware GPIO available but simulation mode requested")
-        elif not gpio_available:
-            self.logger.warning("GPIO not available - forced to simulation mode")
-        else:
-            self.logger.info("Hardware GPIO mode enabled")
+        # Component name for GPIO manager
+        self.component_name = "button_manager"
         
         # Button state tracking
         self.button_states = {}
@@ -87,71 +69,45 @@ class ButtonManager:
         self.event_queue = []
         self.queue_lock = threading.Lock()
         
-        # Keyboard simulation mappings
-        self.keyboard_mappings = {
-            'k': ButtonType.KEY1,    # Mode selection
-            'j': ButtonType.KEY2,    # Settings/brightness
-            'l': ButtonType.KEY3,    # Action/logging
-            'w': ButtonType.JOY_UP,
-            's': ButtonType.JOY_DOWN,
-            'a': ButtonType.JOY_LEFT,
-            'd': ButtonType.JOY_RIGHT,
-            ' ': ButtonType.JOY_PRESS
-        }
-        
-        # Initialize hardware or simulation
+        # Initialize hardware
         self._init_buttons()
         
     def _init_buttons(self):
-        """Initialize button hardware or simulation"""
-        if self.simulate_buttons:
-            self.logger.info("Button manager initialized in simulation mode")
-            self.logger.info("Keyboard mappings: k=KEY1, j=KEY2, l=KEY3, wasd=joystick, space=joy_press")
-            # Initialize button states for simulation
-            for button in ButtonType:
+        """Initialize button hardware"""
+        try:
+            # Register with GPIO manager
+            if not self.gpio_manager.register_component(self.component_name):
+                self.logger.error("Failed to register with GPIO manager")
+                raise RuntimeError("Button manager registration failed")
+            
+            # Request all button pins through GPIO manager
+            if not self.gpio_manager.request_button_pins(self.component_name):
+                self.logger.error("Failed to allocate button pins")
+                raise RuntimeError("Button pin allocation failed")
+            
+            # Set up interrupts for each button
+            for button, pin in self.BUTTON_PINS.items():
+                # Create callback function with proper closure
+                def make_callback(btn):
+                    return lambda pin_num: self._gpio_callback(btn)
+                
+                # Set up interrupt through GPIO manager
+                if not self.gpio_manager.setup_interrupt(
+                    pin, self.component_name, make_callback(button),
+                    edge="BOTH", bouncetime=int(self.debounce_time * 1000)
+                ):
+                    self.logger.error(f"Failed to setup interrupt for {button.value}")
+                    continue
+                
+                # Initialize button state
                 self.button_states[button] = False
                 self.button_press_times[button] = 0
-        else:
-            try:
-                # Clean up any existing GPIO state
-                try:
-                    GPIO.cleanup()
-                except:
-                    pass
-                
-                # Set up GPIO
-                GPIO.setmode(GPIO.BCM)
-                GPIO.setwarnings(False)
-                
-                # Configure button pins
-                for button, pin in self.BUTTON_PINS.items():
-                    try:
-                        # Remove any existing event detection
-                        GPIO.remove_event_detect(pin)
-                    except:
-                        pass
-                    
-                    # Set up the pin
-                    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-                    self.button_states[button] = False
-                    self.button_press_times[button] = 0
-                    
-                    # Set up interrupt for button press (fix lambda closure issue)
-                    def make_callback(btn):
-                        return lambda pin_num: self._gpio_callback(btn)
-                    
-                    GPIO.add_event_detect(pin, GPIO.BOTH, 
-                                        callback=make_callback(button),
-                                        bouncetime=int(self.debounce_time * 1000))
-                    
-                    self.logger.debug(f"GPIO pin {pin} configured for {button.value}")
-                
-                self.logger.info("Button manager initialized with GPIO hardware")
-                
-            except Exception as e:
-                self.logger.error(f"Failed to initialize GPIO: {e}")
-                self.simulate_buttons = True
-                self.logger.info("Falling back to simulation mode")
+            
+            self.logger.info("Button manager initialized with GPIO hardware")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize GPIO buttons: {e}")
+            raise RuntimeError(f"Button hardware initialization failed: {e}")
     
     def start(self):
         """Start button monitoring"""
@@ -159,12 +115,6 @@ class ButtonManager:
             return
             
         self.running = True
-        
-        if self.simulate_buttons:
-            # Start keyboard input thread for simulation
-            self.monitor_thread = threading.Thread(target=self._keyboard_monitor, daemon=True)
-            self.monitor_thread.start()
-            
         self.logger.info("Button monitoring started")
     
     def stop(self):
@@ -174,23 +124,12 @@ class ButtonManager:
         if self.monitor_thread:
             self.monitor_thread.join(timeout=1.0)
             
-        if not self.simulate_buttons and GPIO_AVAILABLE:
-            try:
-                GPIO.cleanup()
-            except:
-                pass
-                
-        self.logger.info("Button monitoring stopped")
+        # Unregister from GPIO manager (this releases all pins)
+        self.gpio_manager.unregister_component(self.component_name)
+        self.logger.info("Button manager stopped")
     
     def register_callback(self, button: ButtonType, event: ButtonEvent, callback: Callable):
-        """
-        Register callback for button event
-        
-        Args:
-            button: Button type
-            event: Event type (press, release, long_press)
-            callback: Function to call when event occurs
-        """
+        """Register callback for button event"""
         key = (button, event)
         if key not in self.event_callbacks:
             self.event_callbacks[key] = []
@@ -221,7 +160,14 @@ class ButtonManager:
             return
             
         pin = self.BUTTON_PINS[button]
-        current_state = not GPIO.input(pin)  # Inverted due to pull-up
+        
+        # Read pin state through GPIO manager
+        pin_state = self.gpio_manager.read_pin(pin)
+        if pin_state is None:
+            self.logger.warning(f"Failed to read pin {pin} for {button.value}")
+            return
+            
+        current_state = not pin_state  # Inverted due to pull-up
         previous_state = self.button_states[button]
         
         if current_state != previous_state:
@@ -277,49 +223,6 @@ class ButtonManager:
                     callback(button, event)
                 except Exception as e:
                     self.logger.error(f"Error in button callback: {e}")
-    
-    def _keyboard_monitor(self):
-        """Monitor keyboard input for simulation mode"""
-        if not self.simulate_buttons:
-            return
-            
-        self.logger.info("Keyboard simulation ready. Use external triggers for button events.")
-        self.logger.info("Button simulation is disabled in production mode.")
-        
-        # Keep thread alive but don't automatically press buttons
-        while self.running:
-            try:
-                time.sleep(1)
-                if not self.running:
-                    break
-                        
-            except KeyboardInterrupt:
-                break
-                    
-        self.logger.info("Keyboard monitor stopped")
-    
-    def _simulate_button_press(self, button: ButtonType):
-        """Simulate a button press for testing"""
-        if not self.running:
-            return
-            
-        self.logger.info(f"Simulating {button.value} press")
-        
-        # Simulate press
-        self._handle_button_state_change(button, True)
-        
-        # Simulate release after short delay
-        threading.Timer(0.1, self._handle_button_state_change, 
-                       args=[button, False]).start()
-    
-    def simulate_button_event(self, button: ButtonType, event: ButtonEvent = ButtonEvent.PRESS):
-        """Manually simulate button event (for testing)"""
-        if event == ButtonEvent.PRESS:
-            self._simulate_button_press(button)
-        elif event == ButtonEvent.LONG_PRESS:
-            self._trigger_event(button, ButtonEvent.LONG_PRESS)
-        else:
-            self._trigger_event(button, event)
 
 
 # Button action handlers for common operations
@@ -355,46 +258,3 @@ class ButtonActions:
         self.logger.info(f"Joystick {direction}")
         if hasattr(self.app, 'handle_navigation'):
             self.app.handle_navigation(direction)
-
-
-# Test function for development
-if __name__ == "__main__":
-    import sys
-    
-    # Set up logging
-    logging.basicConfig(level=logging.INFO, 
-                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    
-    print("Testing Button Manager...")
-    
-    # Create button manager in simulation mode
-    button_manager = ButtonManager(simulate_buttons=True)
-    
-    # Test event callbacks
-    def test_callback(button, event):
-        print(f"Callback: {button.value} {event.value}")
-    
-    # Register test callbacks
-    button_manager.register_callback(ButtonType.KEY1, ButtonEvent.PRESS, test_callback)
-    button_manager.register_callback(ButtonType.KEY2, ButtonEvent.PRESS, test_callback)
-    button_manager.register_callback(ButtonType.KEY3, ButtonEvent.PRESS, test_callback)
-    
-    # Start monitoring
-    button_manager.start()
-    
-    print("Button manager started in simulation mode...")
-    print("Simulated button presses will occur automatically...")
-    print("Press Ctrl+C to stop")
-    
-    try:
-        # Monitor for events
-        while True:
-            events = button_manager.get_button_events()
-            for event in events:
-                print(f"Event: {event['button'].value} {event['event'].value} at {event['timestamp']:.3f}")
-            time.sleep(0.1)
-            
-    except KeyboardInterrupt:
-        print("\nStopping button manager...")
-        button_manager.stop()
-        print("Button manager test complete!")

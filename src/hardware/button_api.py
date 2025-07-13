@@ -12,19 +12,18 @@ from .button_manager import ButtonManager, ButtonType, ButtonEvent, ButtonAction
 class ButtonAPI:
     """Simplified button interface for application modules"""
     
-    def __init__(self, app_context=None, simulate_buttons: bool = False):
+    def __init__(self, app_context=None):
         """
         Initialize button API
         
         Args:
             app_context: Application context for button actions
-            simulate_buttons: Use simulation mode
         """
         self.logger = logging.getLogger(__name__)
         self.app_context = app_context
         
         # Initialize button manager
-        self.button_manager = ButtonManager(simulate_buttons=simulate_buttons)
+        self.button_manager = ButtonManager()
         
         # Initialize button actions
         if app_context:
@@ -89,10 +88,6 @@ class ButtonAPI:
         """Check if button is currently pressed"""
         return self.button_manager.is_button_pressed(button)
     
-    def simulate_button_press(self, button: ButtonType):
-        """Simulate button press (for testing)"""
-        self.button_manager.simulate_button_event(button, ButtonEvent.PRESS)
-    
     # Convenience methods for common operations
     def wait_for_button_press(self, timeout: Optional[float] = None) -> Optional[ButtonType]:
         """
@@ -144,44 +139,6 @@ class ButtonAPI:
                 
             time.sleep(0.01)
     
-    def get_menu_selection(self, options: list, current_selection: int = 0) -> int:
-        """
-        Interactive menu selection using joystick
-        
-        Args:
-            options: List of menu options
-            current_selection: Currently selected option index
-            
-        Returns:
-            Selected option index
-        """
-        selection = current_selection
-        
-        while True:
-            events = self.get_pending_events()
-            for event in events:
-                if event['event'] == ButtonEvent.PRESS:
-                    button = event['button']
-                    
-                    if button == ButtonType.JOY_UP:
-                        selection = (selection - 1) % len(options)
-                        self.logger.info(f"Menu selection: {options[selection]}")
-                        
-                    elif button == ButtonType.JOY_DOWN:
-                        selection = (selection + 1) % len(options)
-                        self.logger.info(f"Menu selection: {options[selection]}")
-                        
-                    elif button == ButtonType.JOY_PRESS or button == ButtonType.KEY3:
-                        self.logger.info(f"Menu confirmed: {options[selection]}")
-                        return selection
-                        
-                    elif button == ButtonType.KEY1:
-                        # Cancel/back
-                        self.logger.info("Menu cancelled")
-                        return -1
-            
-            time.sleep(0.01)
-    
     def confirm_action(self, message: str, timeout: float = 10.0) -> bool:
         """
         Confirm action with user
@@ -219,63 +176,8 @@ class ButtonAPI:
 
 
 # Convenience functions for quick button operations
-def create_button_api(app_context=None, simulate: bool = False) -> ButtonAPI:
+def create_button_api(app_context=None) -> ButtonAPI:
     """Create and start button API"""
-    api = ButtonAPI(app_context, simulate_buttons=simulate)
+    api = ButtonAPI(app_context)
     api.start()
     return api
-
-
-def wait_for_any_button(timeout: Optional[float] = None) -> Optional[ButtonType]:
-    """Quick function to wait for any button press"""
-    api = ButtonAPI(simulate_buttons=True)
-    api.start()
-    try:
-        return api.wait_for_button_press(timeout)
-    finally:
-        api.stop()
-
-
-def get_user_choice(options: list, prompt: str = "Select option:") -> int:
-    """Quick function to get user menu choice"""
-    api = ButtonAPI(simulate_buttons=True)
-    api.start()
-    try:
-        print(f"{prompt}")
-        for i, option in enumerate(options):
-            print(f"{i}: {option}")
-        return api.get_menu_selection(options)
-    finally:
-        api.stop()
-
-
-# Test function
-if __name__ == "__main__":
-    import time
-    
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
-    
-    print("Testing Button API...")
-    
-    # Test basic functionality
-    api = ButtonAPI(simulate_buttons=True)
-    api.start()
-    
-    print("Testing automatic button simulation...")
-    print("Watch for button events...")
-    
-    try:
-        # Monitor for 10 seconds
-        for i in range(100):
-            events = api.get_pending_events()
-            for event in events:
-                print(f"Event: {event['button'].value} {event['event'].value}")
-            time.sleep(0.1)
-            
-    except KeyboardInterrupt:
-        pass
-    finally:
-        api.stop()
-    
-    print("Button API test complete!")

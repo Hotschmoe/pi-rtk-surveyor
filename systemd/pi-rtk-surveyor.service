@@ -1,8 +1,11 @@
 [Unit]
 Description=Pi RTK Surveyor Application
 Documentation=https://github.com/hotschmoe/pi-rtk-surveyor
-After=network.target
+After=network.target local-fs.target
 Wants=network.target
+# Ensure SPI and GPIO are available before starting
+After=systemd-modules-load.service
+Requires=systemd-modules-load.service
 
 [Service]
 Type=simple

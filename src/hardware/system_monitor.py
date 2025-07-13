@@ -13,7 +13,6 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-    logging.warning("psutil not available - system monitoring limited")
 
 class SystemMonitor:
     """Monitors system health and resource usage"""
@@ -25,13 +24,11 @@ class SystemMonitor:
         self.update_interval = 1.0  # Update every second
         self.cached_info = {}
         
-    def get_system_info(self) -> Dict[str, float]:
-        """
-        Get current system information
+        if not PSUTIL_AVAILABLE:
+            self.logger.warning("psutil not available - system monitoring limited")
         
-        Returns:
-            Dictionary containing system metrics
-        """
+    def get_system_info(self) -> Dict[str, float]:
+        """Get current system information"""
         current_time = time.time()
         
         # Return cached info if updated recently
@@ -73,69 +70,87 @@ class SystemMonitor:
                 except:
                     pass
             
-            # Return simulated temperature for development
-            return 42.5
+            # Unable to read temperature
+            self.logger.warning("Unable to read CPU temperature")
+            return 0.0
             
     def _get_memory_usage(self) -> float:
         """Get memory usage percentage"""
         if not PSUTIL_AVAILABLE:
-            return 65.0  # Simulated value
+            self.logger.warning("psutil not available for memory monitoring")
+            return 0.0
             
         try:
             memory = psutil.virtual_memory()
             return memory.percent
         except:
-            return 65.0
+            self.logger.warning("Failed to read memory usage")
+            return 0.0
             
     def _get_cpu_usage(self) -> float:
         """Get CPU usage percentage"""
         if not PSUTIL_AVAILABLE:
-            return 25.0  # Simulated value
+            self.logger.warning("psutil not available for CPU monitoring")
+            return 0.0
             
         try:
             return psutil.cpu_percent(interval=0.1)
         except:
-            return 25.0
+            self.logger.warning("Failed to read CPU usage")
+            return 0.0
             
     def _get_disk_usage(self) -> float:
         """Get disk usage percentage"""
         if not PSUTIL_AVAILABLE:
-            return 45.0  # Simulated value
+            self.logger.warning("psutil not available for disk monitoring")
+            return 0.0
             
         try:
             disk = psutil.disk_usage('/')
             return (disk.used / disk.total) * 100
         except:
-            return 45.0
+            self.logger.warning("Failed to read disk usage")
+            return 0.0
             
     def _get_battery_level(self) -> float:
         """Get battery level percentage"""
         # For Pi with UPS HAT or power bank, this would read from I2C
-        # For now, return simulated decreasing battery level
+        # TODO: Implement actual battery monitoring based on hardware
         try:
             # Try to read from UPS HAT if available
             # This is a placeholder - actual implementation depends on UPS hardware
-            return 85.0  # Simulated value
+            # For now, check if we have a battery sensor
+            if PSUTIL_AVAILABLE:
+                battery = psutil.sensors_battery()
+                if battery:
+                    return battery.percent
         except:
-            return 85.0
+            pass
+            
+        # No battery monitoring available
+        self.logger.debug("No battery monitoring available")
+        return 100.0  # Assume wall power
             
     def _get_uptime(self) -> float:
         """Get system uptime in seconds"""
         if not PSUTIL_AVAILABLE:
-            return time.time() % 3600  # Simulated uptime
+            try:
+                # Fallback: read from /proc/uptime
+                with open('/proc/uptime', 'r') as f:
+                    uptime_seconds = float(f.readline().split()[0])
+                    return uptime_seconds
+            except:
+                self.logger.warning("Unable to read system uptime")
+                return 0.0
             
         try:
             return time.time() - psutil.boot_time()
         except:
-            return time.time() % 3600
+            self.logger.warning("Failed to calculate uptime")
+            return 0.0
             
     def get_formatted_info(self) -> Dict[str, str]:
-        """
-        Get system info formatted as strings for display
-        
-        Returns:
-            Dictionary with formatted system metrics
-        """
+        """Get system info formatted as strings for display"""
         info = self.get_system_info()
         
         return {
@@ -156,38 +171,13 @@ class SystemMonitor:
             return f"{hours}h {minutes}m"
         else:
             return f"{minutes}m"
-            
+    
     def log_system_status(self):
         """Log current system status"""
         info = self.get_formatted_info()
-        
-        self.logger.info(
-            f"System Status - CPU: {info['cpu_temp']} ({info['cpu']}), "
-            f"Memory: {info['memory']}, Battery: {info['battery']}, "
-            f"Uptime: {info['uptime']}"
-        )
-
-
-# Test function for development
-if __name__ == "__main__":
-    import sys
-    
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
-    
-    print("Testing System Monitor...")
-    
-    monitor = SystemMonitor()
-    
-    # Test basic info
-    info = monitor.get_system_info()
-    print(f"System Info: {info}")
-    
-    # Test formatted info
-    formatted = monitor.get_formatted_info()
-    print(f"Formatted Info: {formatted}")
-    
-    # Test logging
-    monitor.log_system_status()
-    
-    print("System monitor test complete!")
+        self.logger.info(f"System Status - "
+                        f"CPU: {info['cpu_temp']}, "
+                        f"Memory: {info['memory']}, "
+                        f"Disk: {info['disk']}, "
+                        f"Battery: {info['battery']}, "
+                        f"Uptime: {info['uptime']}")
