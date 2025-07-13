@@ -25,6 +25,7 @@ pynmea2>=1.19.0
 # Future Web Interface
 flask>=2.3.0
 flask-cors>=4.0.0
+flask-socketio>=5.3.0
 
 # Future WiFi Management
 python-wifi>=0.6.1
