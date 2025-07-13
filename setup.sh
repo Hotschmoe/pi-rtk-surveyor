@@ -24,7 +24,7 @@ echo -e "${BLUE}================================================${NC}"
 if [[ $EUID -eq 0 ]]; then
    echo -e "${RED}Error: This script should not be run as root${NC}"
    echo "Please run as your regular user:"
-   echo "  bash install/setup.sh"
+   echo "  bash setup.sh"
    exit 1
 fi
 
@@ -88,14 +88,14 @@ echo "Creating virtual environment for Python packages..."
 python3 -m venv "${PROJECT_DIR}/venv"
 
 # Install all packages in virtual environment from requirements.txt
-# Note: All Python dependencies are now managed in install/requirements.txt
+# Note: All Python dependencies are now managed in requirements.txt
 echo "Installing all Python packages in virtual environment..."
 "${PROJECT_DIR}/venv/bin/pip" install --upgrade pip
-"${PROJECT_DIR}/venv/bin/pip" install -r "${PROJECT_DIR}/install/requirements.txt"
+"${PROJECT_DIR}/venv/bin/pip" install -r "${PROJECT_DIR}/requirements.txt"
 
 echo -e "${GREEN}Step 6: Setting up systemd service...${NC}"
 # Copy service file to systemd directory and replace placeholders
-cp "${PROJECT_DIR}/install/systemd/${SERVICE_NAME}.service" "/tmp/${SERVICE_NAME}.service"
+cp "${PROJECT_DIR}/systemd/${SERVICE_NAME}.service" "/tmp/${SERVICE_NAME}.service"
 
 # Replace placeholders with actual values
 sed -i "s|PLACEHOLDER_USER|${USER}|g" "/tmp/${SERVICE_NAME}.service"
@@ -111,7 +111,7 @@ sudo systemctl enable "${SERVICE_NAME}.service"
 echo -e "${GREEN}Step 7: Setting up permissions...${NC}"
 # Make scripts executable
 chmod +x "${PROJECT_DIR}/src/main.py"
-chmod +x "${PROJECT_DIR}/install/setup.sh"
+chmod +x "${PROJECT_DIR}/setup.sh"
 
 # Add user to necessary groups
 sudo usermod -a -G spi,i2c,gpio $USER

@@ -62,9 +62,14 @@ git clone https://github.com/hotschmoe/pi-rtk-surveyor.git
 cd pi-rtk-surveyor
 
 # Run setup script
-chmod +x install/setup.sh
-./install/setup.sh
+chmod +x setup.sh
+./setup.sh
 ```
+or
+```bash
+bash setup.sh
+```
+
 
 ### 3. First Survey
 On boot, the system will prompt the user to select BASE or ROVER mode, which will start the appropriate software components.
@@ -72,6 +77,7 @@ On boot, the system will prompt the user to select BASE or ROVER mode, which wil
 ### 4. Project Structure
 ```
 pi-rtk-surveyor/
+├── setup.sh          # setup and install
 ├── src/              # Main application code
 │   ├── main.py       # Application entry point
 │   ├── hardware/     # Hardware interface modules
@@ -80,7 +86,6 @@ pi-rtk-surveyor/
 │   ├── rtk_rover/    # Rover specific code
 │   └── common/       # Shared utilities and libraries
 ├── tests/            # Test files and mock data
-├── install/          # Installation scripts and requirements
 ├── docs/             # Documentation
 └── scripts/          # Utility scripts
 ```
