@@ -101,6 +101,7 @@ echo "Installing packages in virtual environment..."
     colorlog>=6.7.0 \
     pynmea2>=1.19.0 \
     flask-cors>=4.0.0 \
+    flask-socketio>=5.3.0 \
     python-wifi>=0.6.1
 
 echo -e "${GREEN}Step 6: Setting up systemd service...${NC}"
