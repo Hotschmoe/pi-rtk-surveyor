@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import logging
 
-from flask import Flask, render_template, request, jsonify, send_static_file
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 
 # Import RTK Surveyor modules
