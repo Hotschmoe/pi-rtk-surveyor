@@ -121,14 +121,6 @@ cd ${PROJECT_DIR}/src
 ${PROJECT_DIR}/venv/bin/python main.py
 EOF
 
-# Create simulation test script
-cat > "${PROJECT_DIR}/test.sh" << EOF
-#!/bin/bash
-# Test Pi RTK Surveyor in simulation mode
-cd ${PROJECT_DIR}/src
-${PROJECT_DIR}/venv/bin/python main.py --simulate --debug
-EOF
-
 # Create service management script
 cat > "${PROJECT_DIR}/service.sh" << 'EOF'
 #!/bin/bash
@@ -169,7 +161,6 @@ esac
 EOF
 
 chmod +x "${PROJECT_DIR}/start.sh"
-chmod +x "${PROJECT_DIR}/test.sh"
 chmod +x "${PROJECT_DIR}/service.sh"
 
 echo -e "${BLUE}================================================${NC}"
@@ -187,8 +178,6 @@ echo
 echo "3. After reboot, the service will start automatically with hardware support"
 echo
 echo -e "${YELLOW}Manual control:${NC}"
-echo "• Test in simulation mode:"
-echo -e "   ${BLUE}./test.sh${NC}"
 echo
 echo "• Start manually:"
 echo -e "   ${BLUE}./start.sh${NC}"
@@ -202,6 +191,5 @@ echo
 echo -e "${YELLOW}Troubleshooting:${NC}"
 echo "• Check hardware connections"
 echo "• View logs: ./service.sh logs"
-echo "• Test simulation mode: ./test.sh"
 echo
 echo -e "${GREEN}Installation complete!${NC}"
