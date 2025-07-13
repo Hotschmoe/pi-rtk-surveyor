@@ -67,7 +67,23 @@ chmod +x install/setup.sh
 ```
 
 ### 3. First Survey
-on boot, we will propt user for base or rover which will start the next softwares
+On boot, the system will prompt the user to select BASE or ROVER mode, which will start the appropriate software components.
+
+### 4. Project Structure
+```
+pi-rtk-surveyor/
+├── src/              # Main application code
+│   ├── main.py       # Application entry point
+│   ├── hardware/     # Hardware interface modules
+│   ├── web/          # Web interface
+│   ├── rtk_base/     # Base station specific code
+│   ├── rtk_rover/    # Rover specific code
+│   └── common/       # Shared utilities and libraries
+├── tests/            # Test files and mock data
+├── install/          # Installation scripts and requirements
+├── docs/             # Documentation
+└── scripts/          # Utility scripts
+```
 
 ## 📋 Current Status
 
@@ -78,12 +94,15 @@ on boot, we will propt user for base or rover which will start the next software
 - [x] System monitoring (CPU temp, memory, load)
 - [x] Multiple display modes
 - [x] Clean shutdown handling
+- [x] **Project refactor to modular structure** (hardware, web, rtk_base, rtk_rover, common)
+- [x] Systemd service integration
+- [x] Installation and setup scripts
 
 ### 🚧 In Development
-- [ ] LC29H GPS integration
+- [ ] LC29H GPS integration and testing
 - [ ] RTK base station setup
 - [ ] Coordinate logging to CSV
-- [ ] Auto-start service
+- [ ] BASE/ROVER mode selection on startup
 - [ ] Data export for CAD software
 
 ### 🔮 Planned Features

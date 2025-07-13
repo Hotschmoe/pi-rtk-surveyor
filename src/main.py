@@ -13,15 +13,15 @@ import argparse
 from pathlib import Path
 from enum import Enum
 
-# Add software directory to Python path
-software_dir = Path(__file__).parent
-sys.path.insert(0, str(software_dir))
+# Add src directory to Python path
+src_dir = Path(__file__).parent
+sys.path.insert(0, str(src_dir))
 
 # Import local modules
-from display.oled_manager import OLEDManager
-from monitoring.system_monitor import SystemMonitor
-from input.button_api import ButtonAPI, ButtonType, ButtonEvent
-from gnss.lc29h_controller import LC29HController, GNSSPosition, FixType
+from hardware.oled_manager import OLEDManager
+from hardware.system_monitor import SystemMonitor
+from hardware.button_api import ButtonAPI, ButtonType, ButtonEvent
+from common.lc29h_controller import LC29HController, GNSSPosition, FixType
 
 class DisplayMode(Enum):
     """Display modes for the application"""

@@ -87,25 +87,11 @@ sudo apt install -y \
 echo "Creating virtual environment for Python packages..."
 python3 -m venv "${PROJECT_DIR}/venv"
 
-# Install all packages in virtual environment
+# Install all packages in virtual environment from requirements.txt
+# Note: All Python dependencies are now managed in install/requirements.txt
 echo "Installing all Python packages in virtual environment..."
 "${PROJECT_DIR}/venv/bin/pip" install --upgrade pip
-"${PROJECT_DIR}/venv/bin/pip" install \
-    "pillow>=9.0.0" \
-    "psutil>=5.8.0" \
-    "pyyaml>=6.0" \
-    "pyserial>=3.5" \
-    "flask>=2.0.0" \
-    "flask-cors>=4.0.0" \
-    "flask-socketio>=5.3.0" \
-    "pytest>=7.0.0" \
-    "gpiozero>=1.6.0" \
-    "rpi.gpio>=0.7.0" \
-    "luma.oled>=3.12.0" \
-    "configparser>=5.3.0" \
-    "colorlog>=6.7.0" \
-    "pynmea2>=1.19.0" \
-    "python-wifi>=0.6.1"
+"${PROJECT_DIR}/venv/bin/pip" install -r "${PROJECT_DIR}/install/requirements.txt"
 
 echo -e "${GREEN}Step 6: Setting up systemd service...${NC}"
 # Copy service file to systemd directory and replace placeholders
@@ -124,7 +110,7 @@ sudo systemctl enable "${SERVICE_NAME}.service"
 
 echo -e "${GREEN}Step 7: Setting up permissions...${NC}"
 # Make scripts executable
-chmod +x "${PROJECT_DIR}/software/main.py"
+chmod +x "${PROJECT_DIR}/src/main.py"
 chmod +x "${PROJECT_DIR}/install/setup.sh"
 
 # Add user to necessary groups
@@ -186,7 +172,7 @@ sleep 2
 
 # Start web server in background
 echo "Starting web server..."
-PYTHONPATH="${PROJECT_DIR}/software" "${PROJECT_DIR}/venv/bin/python" "${PROJECT_DIR}/software/web/web_server.py" &
+PYTHONPATH="${PROJECT_DIR}/src" "${PROJECT_DIR}/venv/bin/python" "${PROJECT_DIR}/src/web/web_server.py" &
 WEB_PID=$!
 
 # Wait for both processes

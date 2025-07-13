@@ -14,20 +14,20 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import logging
 
-# Add software directory to Python path
-software_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(software_dir))
+# Add src directory to Python path
+src_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(src_dir))
 
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 
 # Import RTK Surveyor modules
-from gnss.lc29h_controller import LC29HController, GNSSPosition, FixType
-from monitoring.system_monitor import SystemMonitor
+from common.lc29h_controller import LC29HController, GNSSPosition, FixType
+from hardware.system_monitor import SystemMonitor
 
 # Optional imports
 try:
-    from monitoring.battery_monitor import BatteryMonitor
+    from hardware.battery_monitor import BatteryMonitor
 except ImportError:
     BatteryMonitor = type(None)
 

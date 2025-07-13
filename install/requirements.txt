@@ -1,4 +1,6 @@
 # Pi RTK Surveyor Dependencies
+# This file is used by install/setup.sh to install all Python packages in a virtual environment
+# To add a new dependency, add it here and it will be automatically installed by setup.sh
 
 # OLED Display
 luma.oled>=3.12.0

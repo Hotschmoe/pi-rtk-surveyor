@@ -8,15 +8,15 @@ Wants=network.target
 Type=simple
 User=PLACEHOLDER_USER
 Group=PLACEHOLDER_USER
-WorkingDirectory=PLACEHOLDER_PROJECT_DIR/software
-ExecStart=PLACEHOLDER_PROJECT_DIR/venv/bin/python PLACEHOLDER_PROJECT_DIR/software/main.py
+WorkingDirectory=PLACEHOLDER_PROJECT_DIR/src
+ExecStart=PLACEHOLDER_PROJECT_DIR/venv/bin/python PLACEHOLDER_PROJECT_DIR/src/main.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
 # Environment variables
-Environment=PYTHONPATH=PLACEHOLDER_PROJECT_DIR/software
+Environment=PYTHONPATH=PLACEHOLDER_PROJECT_DIR/src
 Environment=PYTHONUNBUFFERED=1
 
 # Security settings
