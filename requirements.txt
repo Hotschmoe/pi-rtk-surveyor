@@ -7,8 +7,10 @@ luma.oled>=3.12.0
 pillow>=10.0.0
 
 # GPIO and Hardware
+# Note: System dependencies (libgpiod2, libgpiod-dev) are installed via apt in setup.sh
 RPi.GPIO>=0.7.1
 gpiozero>=1.6.2
+lgpio>=0.2.0.0
 
 # System Monitoring
 psutil>=5.9.0

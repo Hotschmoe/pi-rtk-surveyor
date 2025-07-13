@@ -58,7 +58,9 @@ sudo apt install -y \
     libfreetype6-dev \
     liblcms2-dev \
     libopenjp2-7 \
-    libtiff6
+    libtiff6 \
+    libgpiod2 \
+    libgpiod-dev
 
 echo -e "${GREEN}Step 3: Enabling SPI and I2C interfaces...${NC}"
 echo "SPI and I2C must be enabled for the OLED display to work."
@@ -77,18 +79,11 @@ mkdir -p "${PROJECT_DIR}/data/config"
 
 echo -e "${GREEN}Step 5: Installing Python dependencies...${NC}"
 
-# Install additional system dependencies for Python packages
-echo "Installing additional system dependencies for Python packages..."
-sudo apt install -y \
-    libgpiod2 \
-    libgpiod-dev
-
 # Create virtual environment for all Python packages
 echo "Creating virtual environment for Python packages..."
 python3 -m venv "${PROJECT_DIR}/venv"
 
 # Install all packages in virtual environment from requirements.txt
-# Note: All Python dependencies are now managed in requirements.txt
 echo "Installing all Python packages in virtual environment..."
 "${PROJECT_DIR}/venv/bin/pip" install --upgrade pip
 "${PROJECT_DIR}/venv/bin/pip" install -r "${PROJECT_DIR}/requirements.txt"
@@ -122,74 +117,16 @@ echo -e "${GREEN}Step 8: Creating helper scripts...${NC}"
 cat > "${PROJECT_DIR}/start.sh" << EOF
 #!/bin/bash
 # Start Pi RTK Surveyor manually
-cd ${PROJECT_DIR}/software
+cd ${PROJECT_DIR}/src
 ${PROJECT_DIR}/venv/bin/python main.py
 EOF
 
-# Create test script
+# Create simulation test script
 cat > "${PROJECT_DIR}/test.sh" << EOF
 #!/bin/bash
 # Test Pi RTK Surveyor in simulation mode
-cd ${PROJECT_DIR}/software
+cd ${PROJECT_DIR}/src
 ${PROJECT_DIR}/venv/bin/python main.py --simulate --debug
-EOF
-
-# Create combined web + main app script
-cat > "${PROJECT_DIR}/start_with_web.sh" << 'EOF'
-#!/bin/bash
-# Start Pi RTK Surveyor with Web Interface
-# This script starts both the main application and web server
-
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PROJECT_DIR"
-
-echo "Starting Pi RTK Surveyor with Web Interface..."
-echo "Web interface will be available at: http://localhost:5000"
-echo "Press Ctrl+C to stop both services"
-
-# Function to cleanup background processes
-cleanup() {
-    echo "Stopping services..."
-    kill $MAIN_PID 2>/dev/null
-    kill $WEB_PID 2>/dev/null
-    wait $MAIN_PID 2>/dev/null
-    wait $WEB_PID 2>/dev/null
-    echo "All services stopped"
-    exit 0
-}
-
-# Set up signal handlers
-trap cleanup SIGINT SIGTERM
-
-# Start main application in background
-echo "Starting main application..."
-cd "${PROJECT_DIR}/software"
-"${PROJECT_DIR}/venv/bin/python" main.py --simulate &
-MAIN_PID=$!
-
-# Give main app time to start
-sleep 2
-
-# Start web server in background
-echo "Starting web server..."
-PYTHONPATH="${PROJECT_DIR}/src" "${PROJECT_DIR}/venv/bin/python" "${PROJECT_DIR}/src/web/web_server.py" &
-WEB_PID=$!
-
-# Wait for both processes
-wait $MAIN_PID $WEB_PID
-EOF
-
-# Create web server only script
-cat > "${PROJECT_DIR}/run_web_server.sh" << 'EOF'
-#!/bin/bash
-# Run Pi RTK Surveyor Web Server Only
-# This script runs just the web server component for testing
-
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PROJECT_DIR"
-
-# Start web server using the launcher script
-"${PROJECT_DIR}/venv/bin/python" "${PROJECT_DIR}/run_web_server.py"
 EOF
 
 # Create service management script
@@ -233,14 +170,7 @@ EOF
 
 chmod +x "${PROJECT_DIR}/start.sh"
 chmod +x "${PROJECT_DIR}/test.sh"
-chmod +x "${PROJECT_DIR}/start_with_web.sh"
-chmod +x "${PROJECT_DIR}/run_web_server.sh"
 chmod +x "${PROJECT_DIR}/service.sh"
-
-echo -e "${GREEN}Step 9: Testing installation...${NC}"
-echo "Running quick test..."
-cd "${PROJECT_DIR}/software"
-timeout 10s "${PROJECT_DIR}/venv/bin/python" main.py --simulate || true
 
 echo -e "${BLUE}================================================${NC}"
 echo -e "${GREEN}✅ Installation completed successfully!${NC}"
@@ -262,13 +192,6 @@ echo -e "   ${BLUE}./test.sh${NC}"
 echo
 echo "• Start manually:"
 echo -e "   ${BLUE}./start.sh${NC}"
-echo
-echo "• Start with web interface:"
-echo -e "   ${BLUE}./start_with_web.sh${NC}"
-echo -e "   ${BLUE}Web interface: http://localhost:5000${NC}"
-echo
-echo "• Web server only (for testing):"
-echo -e "   ${BLUE}./run_web_server.sh${NC}"
 echo
 echo "• Service management:"
 echo -e "   ${BLUE}./service.sh status${NC}    # Check service status"
