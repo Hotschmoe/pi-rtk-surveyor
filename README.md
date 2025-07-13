@@ -62,20 +62,12 @@ git clone https://github.com/hotschmoe/pi-rtk-surveyor.git
 cd pi-rtk-surveyor
 
 # Run setup script
-chmod +x setup.sh
-sudo ./setup.sh
+chmod +x install/setup.sh
+./install/setup.sh
 ```
 
 ### 3. First Survey
-```bash
-# Start the RTK monitor
-sudo python3 rtk_monitor.py
-
-# Use button controls to navigate:
-# KEY1: Cycle display modes
-# KEY2: Adjust brightness
-# KEY3: Start/stop logging
-```
+on boot, we will propt user for base or rover which will start the next softwares
 
 ## 📋 Current Status
 
