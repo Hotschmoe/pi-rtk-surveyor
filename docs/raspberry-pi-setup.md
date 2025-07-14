@@ -179,7 +179,7 @@ To modify service settings:
 sudo systemctl edit pi-rtk-surveyor
 ```
 
-### Application Configuration
+### Application Configuration TODO: UPDATE SINCE REFACTOR
 Location: `software/config/device_config.json`
 
 Example configuration:

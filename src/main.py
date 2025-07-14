@@ -7,6 +7,7 @@ import time
 import logging
 import signal
 import sys
+import threading
 from typing import Optional
 
 from hardware.gpio_manager import get_gpio_manager
@@ -40,9 +41,21 @@ class PiRTKSurveyor:
         self.gps_controller: Optional[LC29HController] = None
         
         # Application state
-        self.display_mode = "splash"  # splash, menu, base, rover, system
+        self.display_mode = "splash"  # splash, menu, base_init, rover_init, base, rover, system
         self.device_role = None  # "base" or "rover"
         self.brightness_level = 255
+        self.initialization_complete = False
+        
+        # Base station state
+        self.rovers_connected = 0
+        self.points_logged = 0
+        self.webserver_running = False
+        self.wifi_hotspot_running = False
+        
+        # Rover state
+        self.base_connected = False
+        self.signal_strength = 0
+        self.point_logging_ready = False
         
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -122,6 +135,9 @@ class PiRTKSurveyor:
                     # Update GPS data
                     self._update_gps()
                     
+                    # Handle mode-specific operations
+                    self._handle_mode_operations()
+                    
                     # Small delay to prevent busy waiting
                     time.sleep(0.1)
                     
@@ -157,22 +173,74 @@ class PiRTKSurveyor:
                         memory_usage=info['memory_percent'],
                         battery_level=info['battery_level']
                     )
-            elif self.display_mode in ["base", "rover"]:
-                if self.gps_controller:
-                    # Use the correct method name from LC29HController
-                    gps_position = self.gps_controller.get_position()
-                    if gps_position and gps_position.valid:
-                        self.oled.show_gps_status(
-                            fix_type=gps_position.fix_type.name.replace('_', ' '),
-                            lat=gps_position.latitude,
-                            lon=gps_position.longitude,
-                            accuracy=gps_position.accuracy_horizontal
-                        )
-                    else:
-                        self.oled.show_gps_status("No GPS Data", 0.0, 0.0, 99.9)
+            elif self.display_mode == "base":
+                self._update_base_display()
+            elif self.display_mode == "rover":
+                self._update_rover_display()
                         
         except Exception as e:
             self.logger.error(f"Display update error: {e}")
+    
+    def _update_base_display(self):
+        """Update display for base station mode"""
+        if not self.initialization_complete:
+            return
+            
+        # Get system info for monitoring
+        if self.system_monitor:
+            info = self.system_monitor.get_system_info()
+            battery_level = info['battery_level']
+            uptime = self._format_uptime(info['uptime'])
+        else:
+            battery_level = 0.0
+            uptime = "0m"
+        
+        # Get GPS satellite count
+        satellites = 0
+        if self.gps_controller:
+            position = self.gps_controller.get_position()
+            if position and hasattr(position, 'satellites_used'):
+                satellites = position.satellites_used
+        
+        if self.oled:
+            self.oled.show_base_monitoring(
+                satellites=satellites,
+                rovers_connected=self.rovers_connected,
+                battery_level=battery_level,
+                uptime=uptime,
+                points_logged=self.points_logged
+            )
+    
+    def _update_rover_display(self):
+        """Update display for rover mode"""
+        if not self.initialization_complete:
+            return
+            
+        # Get system info for monitoring
+        if self.system_monitor:
+            info = self.system_monitor.get_system_info()
+            battery_level = info['battery_level']
+            uptime = self._format_uptime(info['uptime'])
+        else:
+            battery_level = 0.0
+            uptime = "0m"
+        
+        # Get GPS satellite count
+        satellites = 0
+        if self.gps_controller:
+            position = self.gps_controller.get_position()
+            if position and hasattr(position, 'satellites_used'):
+                satellites = position.satellites_used
+        
+        if self.oled:
+            self.oled.show_rover_monitoring(
+                satellites=satellites,
+                base_connected=self.base_connected,
+                signal_strength=self.signal_strength,
+                battery_level=battery_level,
+                uptime=uptime,
+                point_ready=self.point_logging_ready
+            )
     
     def _process_button_events(self):
         """Process button events from the button API"""
@@ -203,12 +271,18 @@ class PiRTKSurveyor:
         if event_type == ButtonEvent.PRESS:
             if button == ButtonType.KEY1:
                 self.device_role = "base"
-                self.display_mode = "base"
+                self.display_mode = "base_init"
+                self.initialization_complete = False
                 self.logger.info("Device set to Base Station mode")
+                # Start base initialization in background thread
+                threading.Thread(target=self._initialize_base_station, daemon=True).start()
             elif button == ButtonType.KEY2:
                 self.device_role = "rover"
-                self.display_mode = "rover"
+                self.display_mode = "rover_init"
+                self.initialization_complete = False
                 self.logger.info("Device set to Rover mode")
+                # Start rover initialization in background thread
+                threading.Thread(target=self._initialize_rover, daemon=True).start()
             elif button == ButtonType.KEY3:
                 self.display_mode = "system"
                 self.logger.info("Switched to System Info mode")
@@ -220,11 +294,86 @@ class PiRTKSurveyor:
         if event_type == ButtonEvent.PRESS:
             if button == ButtonType.KEY1:
                 self.display_mode = "menu"
+                self.device_role = None
+                self.initialization_complete = False
                 self.logger.info("Returned to menu")
             elif button == ButtonType.KEY2:
                 self.adjust_brightness()
             elif button == ButtonType.KEY3:
-                self.toggle_logging()
+                if self.device_role == "rover":
+                    self.log_survey_point()
+                else:
+                    self.toggle_logging()
+    
+    def _initialize_base_station(self):
+        """Initialize base station components"""
+        self.logger.info("Starting base station initialization...")
+        
+        # Step 1: Show base splash
+        if self.oled:
+            self.oled.show_base_init_screen("1/3", "Base Station Mode")
+        time.sleep(2)
+        
+        # Step 2: Initialize web server
+        if self.oled:
+            self.oled.show_base_init_screen("2/3", "Starting Web Server...")
+        time.sleep(2)
+        # TODO: Start actual web server
+        self.webserver_running = True
+        self.logger.info("Web server initialized (placeholder)")
+        
+        # Step 3: Initialize WiFi hotspot
+        if self.oled:
+            self.oled.show_base_init_screen("3/3", "Starting WiFi Hotspot...")
+        time.sleep(2)
+        # TODO: Start actual WiFi hotspot
+        self.wifi_hotspot_running = True
+        self.logger.info("WiFi hotspot initialized (placeholder)")
+        
+        # Initialization complete
+        self.initialization_complete = True
+        self.display_mode = "base"
+        self.logger.info("Base station initialization complete")
+    
+    def _initialize_rover(self):
+        """Initialize rover components"""
+        self.logger.info("Starting rover initialization...")
+        
+        # Step 1: Show rover splash
+        if self.oled:
+            self.oled.show_rover_init_screen("1/2", "Rover Mode")
+        time.sleep(2)
+        
+        # Step 2: Connect to base station
+        if self.oled:
+            self.oled.show_rover_init_screen("2/2", "Searching for base...")
+        time.sleep(2)
+        
+        # Simulate finding base
+        if self.oled:
+            self.oled.show_rover_init_screen("2/2", "Base found! Connecting...")
+        time.sleep(2)
+        
+        # TODO: Implement actual base connection
+        self.base_connected = True
+        self.signal_strength = 85  # Placeholder
+        self.point_logging_ready = True
+        self.logger.info("Connected to base station (placeholder)")
+        
+        # Initialization complete
+        self.initialization_complete = True
+        self.display_mode = "rover"
+        self.logger.info("Rover initialization complete")
+    
+    def _handle_mode_operations(self):
+        """Handle ongoing operations for current mode"""
+        if self.device_role == "base" and self.initialization_complete:
+            # Base station operations
+            pass  # TODO: Monitor rovers, handle connections
+            
+        elif self.device_role == "rover" and self.initialization_complete:
+            # Rover operations
+            pass  # TODO: Monitor base connection, handle corrections
     
     def _update_gps(self):
         """Update GPS data"""
@@ -236,6 +385,16 @@ class PiRTKSurveyor:
             pass
         except Exception as e:
             self.logger.error(f"GPS update error: {e}")
+    
+    def _format_uptime(self, uptime_seconds: float) -> str:
+        """Format uptime in human readable format"""
+        hours = int(uptime_seconds // 3600)
+        minutes = int((uptime_seconds % 3600) // 60)
+        
+        if hours > 0:
+            return f"{hours}h{minutes}m"
+        else:
+            return f"{minutes}m"
     
     def cycle_display_mode(self):
         """Cycle through display modes"""
@@ -261,6 +420,13 @@ class PiRTKSurveyor:
         """Toggle logging state"""
         # This would start/stop survey logging
         self.logger.info("Logging toggled")
+    
+    def log_survey_point(self):
+        """Log a survey point (rover mode)"""
+        if self.device_role == "rover" and self.point_logging_ready:
+            self.points_logged += 1
+            self.logger.info(f"Survey point logged: {self.points_logged}")
+            # TODO: Implement actual point logging
     
     def handle_navigation(self, direction: str):
         """Handle joystick navigation"""

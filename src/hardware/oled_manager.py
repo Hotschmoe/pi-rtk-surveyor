@@ -164,6 +164,180 @@ class OLEDManager:
             draw.text(((width - instr_width) // 2, 55), instruction, font=font_option, fill=255)
         
         self._display_content(draw_selection)
+
+    def show_base_init_screen(self, init_step: str, status: str = ""):
+        """Display base station initialization screen"""
+        def draw_base_init(draw, width, height):
+            # Clear screen
+            draw.rectangle((0, 0, width, height), outline=0, fill=0)
+            
+            try:
+                font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+                font_status = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+            except:
+                font_title = ImageFont.load_default()
+                font_status = ImageFont.load_default()
+            
+            # Title
+            title = "BASE STATION"
+            title_bbox = draw.textbbox((0, 0), title, font=font_title)
+            title_width = title_bbox[2] - title_bbox[0]
+            draw.text(((width - title_width) // 2, 5), title, font=font_title, fill=255)
+            
+            # Current step
+            step_text = f"Step: {init_step}"
+            draw.text((5, 25), step_text, font=font_status, fill=255)
+            
+            # Status
+            if status:
+                draw.text((5, 40), status, font=font_status, fill=255)
+            
+            # Loading indicator
+            loading = "Initializing..."
+            loading_bbox = draw.textbbox((0, 0), loading, font=font_status)
+            loading_width = loading_bbox[2] - loading_bbox[0]
+            draw.text(((width - loading_width) // 2, 55), loading, font=font_status, fill=255)
+        
+        self._display_content(draw_base_init)
+
+    def show_rover_init_screen(self, init_step: str, status: str = ""):
+        """Display rover initialization screen"""
+        def draw_rover_init(draw, width, height):
+            # Clear screen
+            draw.rectangle((0, 0, width, height), outline=0, fill=0)
+            
+            try:
+                font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+                font_status = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+            except:
+                font_title = ImageFont.load_default()
+                font_status = ImageFont.load_default()
+            
+            # Title
+            title = "ROVER"
+            title_bbox = draw.textbbox((0, 0), title, font=font_title)
+            title_width = title_bbox[2] - title_bbox[0]
+            draw.text(((width - title_width) // 2, 5), title, font=font_title, fill=255)
+            
+            # Current step
+            step_text = f"Step: {init_step}"
+            draw.text((5, 25), step_text, font=font_status, fill=255)
+            
+            # Status
+            if status:
+                draw.text((5, 40), status, font=font_status, fill=255)
+            
+            # Loading indicator
+            loading = "Connecting..."
+            loading_bbox = draw.textbbox((0, 0), loading, font=font_status)
+            loading_width = loading_bbox[2] - loading_bbox[0]
+            draw.text(((width - loading_width) // 2, 55), loading, font=font_status, fill=255)
+        
+        self._display_content(draw_rover_init)
+
+    def show_base_monitoring(self, satellites: int, rovers_connected: int, 
+                           battery_level: float, uptime: str, points_logged: int):
+        """Display base station monitoring information"""
+        def draw_base_monitor(draw, width, height):
+            # Clear screen
+            draw.rectangle((0, 0, width, height), outline=0, fill=0)
+            
+            try:
+                font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+                font_info = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
+            except:
+                font_title = ImageFont.load_default()
+                font_info = ImageFont.load_default()
+            
+            # Title
+            title = "BASE STATION"
+            title_bbox = draw.textbbox((0, 0), title, font=font_title)
+            title_width = title_bbox[2] - title_bbox[0]
+            draw.text(((width - title_width) // 2, 2), title, font=font_title, fill=255)
+            
+            # Monitoring info
+            sat_text = f"SATs: {satellites}"
+            rovers_text = f"Rovers: {rovers_connected}"
+            battery_text = f"Batt: {battery_level:.1f}%"
+            uptime_text = f"Up: {uptime}"
+            points_text = f"Points: {points_logged}"
+            
+            draw.text((2, 16), sat_text, font=font_info, fill=255)
+            draw.text((65, 16), rovers_text, font=font_info, fill=255)
+            draw.text((2, 28), battery_text, font=font_info, fill=255)
+            draw.text((65, 28), uptime_text, font=font_info, fill=255)
+            draw.text((2, 40), points_text, font=font_info, fill=255)
+            
+            # Status indicators
+            # Satellite status
+            sat_color = 255 if satellites >= 4 else 128
+            draw.rectangle((120, 16, 126, 22), outline=255, fill=sat_color)
+            
+            # Battery status
+            batt_color = 255 if battery_level > 20 else 128
+            draw.rectangle((120, 28, 126, 34), outline=255, fill=batt_color)
+            
+            # Bottom status line
+            status = f"Base Ready - KEY1:Menu"
+            draw.text((2, 52), status, font=font_info, fill=255)
+        
+        self._display_content(draw_base_monitor)
+
+    def show_rover_monitoring(self, satellites: int, base_connected: bool, 
+                            signal_strength: int, battery_level: float, 
+                            uptime: str, point_ready: bool = False):
+        """Display rover monitoring information"""
+        def draw_rover_monitor(draw, width, height):
+            # Clear screen
+            draw.rectangle((0, 0, width, height), outline=0, fill=0)
+            
+            try:
+                font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+                font_info = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
+            except:
+                font_title = ImageFont.load_default()
+                font_info = ImageFont.load_default()
+            
+            # Title
+            title = "ROVER"
+            title_bbox = draw.textbbox((0, 0), title, font=font_title)
+            title_width = title_bbox[2] - title_bbox[0]
+            draw.text(((width - title_width) // 2, 2), title, font=font_title, fill=255)
+            
+            # Monitoring info
+            sat_text = f"SATs: {satellites}"
+            base_text = f"Base: {'OK' if base_connected else 'NO'}"
+            signal_text = f"Signal: {signal_strength}%"
+            battery_text = f"Batt: {battery_level:.1f}%"
+            uptime_text = f"Up: {uptime}"
+            
+            draw.text((2, 16), sat_text, font=font_info, fill=255)
+            draw.text((65, 16), base_text, font=font_info, fill=255)
+            draw.text((2, 28), signal_text, font=font_info, fill=255)
+            draw.text((65, 28), battery_text, font=font_info, fill=255)
+            draw.text((2, 40), uptime_text, font=font_info, fill=255)
+            
+            # Status indicators
+            # Satellite status
+            sat_color = 255 if satellites >= 4 else 128
+            draw.rectangle((120, 16, 126, 22), outline=255, fill=sat_color)
+            
+            # Base connection status
+            base_color = 255 if base_connected else 64
+            draw.rectangle((120, 28, 126, 34), outline=255, fill=base_color)
+            
+            # Battery status
+            batt_color = 255 if battery_level > 20 else 128
+            draw.rectangle((120, 40, 126, 46), outline=255, fill=batt_color)
+            
+            # Bottom status line
+            if point_ready:
+                status = "Ready - KEY3:Log Point"
+            else:
+                status = "Rover Ready - KEY1:Menu"
+            draw.text((2, 52), status, font=font_info, fill=255)
+        
+        self._display_content(draw_rover_monitor)
         
     def show_system_info(self, cpu_temp: float, memory_usage: float, battery_level: float):
         """Display system information"""
