@@ -35,6 +35,9 @@ class OLEDManager:
         self.width = 128
         self.height = 64
         
+        # Display rotation: 0=normal, 1=90°, 2=180° (upside down fix), 3=270°
+        self.rotation = 2  # Default to 180° to fix upside-down text
+        
         # Set up logging first (needed by _init_display)
         self.logger = logging.getLogger(__name__)
         
@@ -67,9 +70,9 @@ class OLEDManager:
             # Initialize the luma.oled device
             # Waveshare 1.3" OLED uses SH1106 controller
             serial = spi(device=0, port=0)
-            self.device = sh1106(serial, width=self.width, height=self.height)
+            self.device = sh1106(serial, width=self.width, height=self.height, rotate=self.rotation)
             self.device.contrast(self.brightness)
-            self.logger.info("OLED display initialized successfully")
+            self.logger.info(f"OLED display initialized successfully with {self.rotation * 90}° rotation")
             
         except Exception as e:
             self.logger.error(f"Failed to initialize OLED display: {e}")
@@ -425,3 +428,38 @@ class OLEDManager:
                 
         except Exception as e:
             self.logger.error(f"Error displaying content: {e}")
+
+    def set_rotation(self, rotation: int):
+        """
+        Set display rotation
+        Args:
+            rotation: 0=normal, 1=90°, 2=180°, 3=270°
+        """
+        if rotation not in [0, 1, 2, 3]:
+            self.logger.warning(f"Invalid rotation value {rotation}, must be 0-3")
+            return False
+            
+        if self.rotation == rotation:
+            return True  # No change needed
+            
+        self.rotation = rotation
+        self.logger.info(f"Setting display rotation to {rotation * 90} degrees")
+        
+        # If device is already initialized, we need to reinitialize it
+        if self.device:
+            try:
+                # Clean up current device
+                self.device.cleanup()
+                
+                # Reinitialize with new rotation
+                serial = spi(device=0, port=0)
+                self.device = sh1106(serial, width=self.width, height=self.height, rotate=self.rotation)
+                self.device.contrast(self.brightness)
+                self.logger.info(f"Display rotation updated to {self.rotation * 90}°")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Failed to update display rotation: {e}")
+                return False
+        
+        return True
