@@ -85,25 +85,12 @@ class ButtonManager:
                 self.logger.error("Failed to allocate button pins")
                 raise RuntimeError("Button pin allocation failed")
             
-            # Set up interrupts for each button
-            for button, pin in self.BUTTON_PINS.items():
-                # Create callback function with proper closure
-                def make_callback(btn):
-                    return lambda pin_num: self._gpio_callback(btn)
-                
-                # Set up interrupt through GPIO manager
-                if not self.gpio_manager.setup_interrupt(
-                    pin, self.component_name, make_callback(button),
-                    edge="BOTH", bouncetime=int(self.debounce_time * 1000)
-                ):
-                    self.logger.error(f"Failed to setup interrupt for {button.value}")
-                    continue
-                
-                # Initialize button state
+            # Initialize button states (no interrupts, we'll use polling)
+            for button in self.BUTTON_PINS:
                 self.button_states[button] = False
                 self.button_press_times[button] = 0
             
-            self.logger.info("Button manager initialized with GPIO hardware")
+            self.logger.info("Button manager initialized with GPIO hardware (polling mode)")
             
         except Exception as e:
             self.logger.error(f"Failed to initialize GPIO buttons: {e}")
@@ -115,7 +102,12 @@ class ButtonManager:
             return
             
         self.running = True
-        self.logger.info("Button monitoring started")
+        
+        # Start polling thread
+        self.monitor_thread = threading.Thread(target=self._polling_loop, daemon=True)
+        self.monitor_thread.start()
+        
+        self.logger.info("Button monitoring started (polling mode)")
     
     def stop(self):
         """Stop button monitoring"""
@@ -154,39 +146,27 @@ class ButtonManager:
         """Check if button is currently pressed"""
         return self.button_states.get(button, False)
     
-    def _gpio_callback(self, button: ButtonType):
-        """GPIO interrupt callback"""
-        if not self.running:
-            return
-            
-        pin = self.BUTTON_PINS[button]
-        
-        # Read pin state through GPIO manager
-        pin_state = self.gpio_manager.read_pin(pin)
-        if pin_state is None:
-            self.logger.warning(f"Failed to read pin {pin} for {button.value}")
-            return
-            
-        current_state = not pin_state  # Inverted due to pull-up
-        previous_state = self.button_states[button]
-        
-        if current_state != previous_state:
-            self._handle_button_state_change(button, current_state)
-    
     def _handle_button_state_change(self, button: ButtonType, pressed: bool):
-        """Handle button state change"""
+        """Handle button state change with debouncing"""
         current_time = time.time()
+        
+        # Simple debouncing: ignore rapid state changes
+        if hasattr(self, '_last_change_times'):
+            if button in self._last_change_times:
+                if current_time - self._last_change_times[button] < self.debounce_time:
+                    return  # Ignore this change (too soon)
+        else:
+            self._last_change_times = {}
+        
+        self._last_change_times[button] = current_time
         
         if pressed:
             # Button pressed
             self.button_states[button] = True
             self.button_press_times[button] = current_time
             self._trigger_event(button, ButtonEvent.PRESS)
+            self.logger.debug(f"{button.value} pressed")
             
-            # Start long press detection
-            threading.Timer(self.long_press_time, 
-                          self._check_long_press, 
-                          args=[button, current_time]).start()
         else:
             # Button released
             if self.button_states[button]:  # Was previously pressed
@@ -194,16 +174,25 @@ class ButtonManager:
                 self.button_states[button] = False
                 self._trigger_event(button, ButtonEvent.RELEASE)
                 
-                # Don't trigger release if it was a long press
+                # Log press duration for debugging
                 if press_duration < self.long_press_time:
-                    self.logger.debug(f"{button.value} short press: {press_duration:.3f}s")
+                    self.logger.debug(f"{button.value} released after {press_duration:.3f}s")
+                
+                # Reset press time
+                self.button_press_times[button] = 0
     
-    def _check_long_press(self, button: ButtonType, press_start_time: float):
-        """Check if button is still pressed for long press detection"""
-        if (self.button_states.get(button, False) and 
-            self.button_press_times[button] == press_start_time):
-            self._trigger_event(button, ButtonEvent.LONG_PRESS)
-            self.logger.debug(f"{button.value} long press detected")
+    def _check_long_presses(self):
+        """Check for long press conditions"""
+        current_time = time.time()
+        
+        for button in self.BUTTON_PINS:
+            if (self.button_states[button] and 
+                self.button_press_times[button] > 0 and
+                current_time - self.button_press_times[button] >= self.long_press_time):
+                
+                # Trigger long press event only once
+                self._trigger_event(button, ButtonEvent.LONG_PRESS)
+                self.button_press_times[button] = 0  # Prevent repeated long press events
     
     def _trigger_event(self, button: ButtonType, event: ButtonEvent):
         """Trigger button event callbacks"""
@@ -223,6 +212,38 @@ class ButtonManager:
                     callback(button, event)
                 except Exception as e:
                     self.logger.error(f"Error in button callback: {e}")
+
+    def _polling_loop(self):
+        """Main polling loop for button state detection"""
+        self.logger.debug("Button polling loop started")
+        
+        while self.running:
+            try:
+                for button, pin in self.BUTTON_PINS.items():
+                    # Read pin state through GPIO manager
+                    pin_state = self.gpio_manager.read_pin(pin)
+                    if pin_state is None:
+                        continue
+                    
+                    # Button logic: 0 = pressed (due to pull-up), 1 = released
+                    current_pressed = (pin_state == 0)
+                    previous_pressed = self.button_states[button]
+                    
+                    # Detect state changes
+                    if current_pressed != previous_pressed:
+                        self._handle_button_state_change(button, current_pressed)
+                
+                # Check for long presses
+                self._check_long_presses()
+                
+                # Small delay to prevent excessive CPU usage
+                time.sleep(0.01)  # 10ms polling interval
+                
+            except Exception as e:
+                self.logger.error(f"Error in button polling loop: {e}")
+                time.sleep(0.1)  # Longer delay on error
+                 
+         self.logger.debug("Button polling loop stopped")
 
 
 # Button action handlers for common operations
