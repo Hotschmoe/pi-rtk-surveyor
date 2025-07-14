@@ -53,6 +53,8 @@ sudo apt install -y \
     i2c-tools \
     spi-tools \
     python3-dev \
+    python3-smbus \
+    python3-pil \
     libjpeg-dev \
     zlib1g-dev \
     libfreetype6-dev \
