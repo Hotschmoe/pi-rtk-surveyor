@@ -242,8 +242,8 @@ class ButtonManager:
             except Exception as e:
                 self.logger.error(f"Error in button polling loop: {e}")
                 time.sleep(0.1)  # Longer delay on error
-                 
-         self.logger.debug("Button polling loop stopped")
+        
+        self.logger.debug("Button polling loop stopped")
 
 
 # Button action handlers for common operations
