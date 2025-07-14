@@ -31,19 +31,16 @@ cd pi-rtk-surveyor
 ### 2. Run Installation Script
 ```bash
 # Make setup script executable
-chmod +x install/setup.sh
+chmod +x setup.sh
 
 # Run installation (do NOT use sudo)
-./install/setup.sh
+./setup.sh
 ```
 
 ### 3. Reboot and Test
 ```bash
 # Reboot to enable SPI/I2C
 sudo reboot
-
-# After reboot, test the installation
-./test.sh
 ```
 
 ## Detailed Installation Steps
@@ -125,18 +122,6 @@ tail -f data/logs/rtk_surveyor.log
 ./service.sh logs
 ```
 
-### Step 4: Testing and Development
-
-#### Test in Simulation Mode
-```bash
-# Test without hardware (useful for development)
-./test.sh
-
-# Or manually:
-cd software
-python3 main.py --simulate --debug
-```
-
 #### Manual Start (for debugging)
 ```bash
 # Stop the service first
@@ -146,13 +131,12 @@ python3 main.py --simulate --debug
 ./start.sh
 
 # Or with debug output:
-cd software
-python3 main.py --debug
+python3 src/main.py --log-level DEBUG
 ```
 
 ## Hardware Configuration
 
-### Pin Connections
+### Pin Connections TODO: VERIFY THIS
 
 The Waveshare 1.3" OLED HAT uses these pins:
 ```
