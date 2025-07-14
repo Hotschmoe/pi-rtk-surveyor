@@ -29,7 +29,7 @@
 
 
 import time
-from smbus import SMBus
+from smbus2 import SMBus
 import spidev
 import ctypes
 from gpiozero import *
