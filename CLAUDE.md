@@ -8,18 +8,18 @@ This is a Pi RTK Surveyor project that creates a professional-grade RTK surveyin
 
 ## Architecture
 
-The codebase uses a modular architecture centered around a bootloader pattern:
+The codebase uses a simplified, integrated architecture:
 
 ### Core Components
-- **main.py**: Bootloader that handles hardware initialization and mode selection (BASE or ROVER)
+- **main.py**: Integrated application containing bootloader, base station, and rover functionality
 - **hardware/**: Hardware abstraction layer for GPIO, OLED display, buttons, and system monitoring
-- **rtk_base/**: Base station specific functionality
-- **rtk_rover/**: Rover specific functionality  
 - **common/**: Shared utilities including GPS controller, NMEA parsing, data logging, and communication protocols
-- **web/**: Web interface for remote monitoring
+- **web/**: Web interface for base station remote monitoring
 
 ### Key Architecture Patterns
-- Hardware components are initialized once in the bootloader and passed to the selected mode
+- All functionality is contained in a single PiRTKSurveyor class in main.py
+- Hardware components are initialized once and shared across all modes
+- Mode selection switches between different operational states within the same application
 - GPIO management is centralized through gpio_manager.py
 - Display management uses luma.oled with custom screens and UI elements
 - System runs as a systemd service with proper resource limits and security settings
@@ -83,7 +83,10 @@ This project is designed for real hardware testing only - no simulation modes:
 
 ## Key Files to Understand
 
-- `src/main.py:89`: Main bootloader run loop
+- `src/main.py`: Complete application with bootloader, base station, and rover functionality
+  - `PiRTKSurveyor.run()`: Main application loop
+  - `_start_base_station()`: Base station mode initialization and operation
+  - `_start_rover()`: Rover mode initialization and operation
 - `src/hardware/gpio_manager.py`: Centralized GPIO pin management
 - `src/hardware/oled_manager.py`: Display management using luma.oled
 - `src/hardware/button_api.py`: Button event handling system
@@ -103,5 +106,7 @@ This project is designed for real hardware testing only - no simulation modes:
 - Hardware interfaces (SPI/I2C) must be enabled via raspi-config before first use
 - The system uses systemd for service management with security restrictions
 - All hardware operations require actual GPIO pins - this is not a simulation-friendly codebase
-- Button events are processed through a centralized ButtonAPI system
+- **Simplified Architecture**: All functionality is integrated into main.py - no separate modules to import
+- Mode selection (BASE/ROVER) switches operational states within the same running application
+- Button events are processed through a centralized ButtonAPI system with mode-specific handlers
 - Display updates use the luma.oled library with custom screen implementations
