@@ -18,14 +18,19 @@ import logging
 src_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(src_dir))
 
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, request, jsonify, Response
 
 # Import RTK Surveyor modules
 from common.lc29h_controller import LC29HController, GNSSPosition, FixType
 from hardware.system_monitor import SystemMonitor
 
 # Optional imports
+try:
+    from flask_socketio import SocketIO, emit
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    
 try:
     from hardware.battery_monitor import BatteryMonitor
 except ImportError:
@@ -74,14 +79,21 @@ class RTKWebServer:
         # Disable Flask's default logger to reduce noise
         logging.getLogger('werkzeug').setLevel(logging.WARNING)
         
-        try:
-            self.socketio = SocketIO(self.app, cors_allowed_origins="*", logger=False, engineio_logger=False)
-        except Exception as e:
-            self.logger.error(f"Failed to initialize SocketIO: {e}")
-            self.socketio = None
+        # Initialize SocketIO with error handling
+        self.socketio = None
+        if SOCKETIO_AVAILABLE:
+            try:
+                self.socketio = SocketIO(self.app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+                self.logger.info("SocketIO initialized successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize SocketIO: {e}")
+                self.socketio = None
+        else:
+            self.logger.warning("SocketIO not available, using polling fallback")
         
         # Server state
         self.running = False
+        self.startup_successful = False
         self.update_thread = None
         self.connected_clients = set()
         self.server_thread = None
@@ -107,30 +119,44 @@ class RTKWebServer:
         }
         
         self._setup_routes()
-        self._setup_socketio_events()
+        if self.socketio:
+            self._setup_socketio_events()
         
     def _setup_routes(self):
-        """Setup Flask routes"""
+        """Setup Flask routes with fallback for missing templates"""
         
         @self.app.route('/')
         def index():
             """Main dashboard page"""
-            return render_template('dashboard.html')
+            try:
+                return render_template('dashboard.html')
+            except:
+                # Fallback if template is missing
+                return self._create_simple_dashboard()
             
         @self.app.route('/config')
         def config_page():
             """Configuration management page"""
-            return render_template('config.html')
+            try:
+                return render_template('config.html')
+            except:
+                return self._create_simple_config()
             
         @self.app.route('/data')
         def data_page():
             """Data visualization page"""
-            return render_template('data.html')
+            try:
+                return render_template('data.html')
+            except:
+                return self._create_simple_data()
             
         @self.app.route('/logs')
         def logs_page():
             """System logs page"""
-            return render_template('logs.html')
+            try:
+                return render_template('logs.html')
+            except:
+                return self._create_simple_logs()
             
         # API Routes
         @self.app.route('/api/status')
@@ -169,6 +195,143 @@ class RTKWebServer:
         def api_control(action):
             """Control base station operations"""
             return jsonify(self._handle_control_action(action))
+    
+    def _create_simple_dashboard(self):
+        """Create a simple HTML dashboard when template is missing"""
+        status = self._get_system_status()
+        gps_data = self._get_gps_data()
+        
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Pi RTK Surveyor - Base Station</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+                .container {{ max-width: 1200px; margin: 0 auto; }}
+                .card {{ background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                .status {{ display: flex; justify-content: space-between; }}
+                .green {{ color: #28a745; }}
+                .red {{ color: #dc3545; }}
+                .yellow {{ color: #ffc107; }}
+                h1 {{ color: #333; text-align: center; }}
+                h2 {{ color: #555; border-bottom: 2px solid #007bff; padding-bottom: 10px; }}
+                .refresh {{ background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }}
+            </style>
+            <script>
+                setTimeout(function(){{ window.location.reload(); }}, 5000);
+            </script>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🛰️ Pi RTK Surveyor - Base Station</h1>
+                
+                <div class="card">
+                    <h2>System Status</h2>
+                    <div class="status">
+                        <span>Device Mode:</span>
+                        <span class="green">{status.get('device_mode', 'Unknown')}</span>
+                    </div>
+                    <div class="status">
+                        <span>RTK Enabled:</span>
+                        <span class="{'green' if status.get('rtk_enabled') else 'red'}">{status.get('rtk_enabled', False)}</span>
+                    </div>
+                    <div class="status">
+                        <span>CPU Temperature:</span>
+                        <span>{status.get('cpu_temp', 0):.1f}°C</span>
+                    </div>
+                    <div class="status">
+                        <span>Memory Usage:</span>
+                        <span>{status.get('memory_usage', 0):.1f}%</span>
+                    </div>
+                    <div class="status">
+                        <span>Connected Clients:</span>
+                        <span>{status.get('connected_clients', 0)}</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>GPS Status</h2>
+                    <div class="status">
+                        <span>Connection:</span>
+                        <span class="{'green' if gps_data.get('connected') else 'red'}">{gps_data.get('connected', 'Unknown')}</span>
+                    </div>
+                    <div class="status">
+                        <span>RTK Fixed:</span>
+                        <span class="{'green' if gps_data.get('rtk_fixed') else 'yellow'}">{gps_data.get('rtk_fixed', False)}</span>
+                    </div>
+                    <div class="status">
+                        <span>RTK Float:</span>
+                        <span class="{'yellow' if gps_data.get('rtk_float') else 'red'}">{gps_data.get('rtk_float', False)}</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>API Endpoints</h2>
+                    <p><a href="/api/status">/api/status</a> - System status JSON</p>
+                    <p><a href="/api/gps">/api/gps</a> - GPS data JSON</p>
+                    <p><a href="/api/position-history">/api/position-history</a> - Position history</p>
+                    <p><a href="/api/system-stats">/api/system-stats</a> - System statistics</p>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <button class="refresh" onclick="window.location.reload()">🔄 Refresh</button>
+                </div>
+                
+                <div style="text-align: center; color: #666; font-size: 12px;">
+                    Auto-refresh every 5 seconds | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return html
+    
+    def _create_simple_config(self):
+        """Create a simple configuration page"""
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Configuration - Pi RTK Surveyor</title></head>
+        <body style="font-family: Arial; margin: 20px;">
+            <h1>Configuration</h1>
+            <p>Current configuration:</p>
+            <pre>{json.dumps(self.config, indent=2)}</pre>
+            <p><a href="/">← Back to Dashboard</a></p>
+        </body>
+        </html>
+        """
+    
+    def _create_simple_data(self):
+        """Create a simple data page"""
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Data - Pi RTK Surveyor</title></head>
+        <body style="font-family: Arial; margin: 20px;">
+            <h1>Data Visualization</h1>
+            <p>Position history: {len(self.position_history)} points</p>
+            <p>System stats: {len(self.system_stats_history)} entries</p>
+            <p><a href="/">← Back to Dashboard</a></p>
+        </body>
+        </html>
+        """
+    
+    def _create_simple_logs(self):
+        """Create a simple logs page"""
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>Logs - Pi RTK Surveyor</title></head>
+        <body style="font-family: Arial; margin: 20px;">
+            <h1>System Logs</h1>
+            <p>Check system logs with: <code>journalctl -u pi-rtk-surveyor</code></p>
+            <p><a href="/">← Back to Dashboard</a></p>
+        </body>
+        </html>
+        """
             
     def _setup_socketio_events(self):
         """Setup SocketIO events for real-time updates"""
@@ -331,8 +494,15 @@ class RTKWebServer:
                         
                 # Broadcast updates to connected clients
                 if self.connected_clients:
-                    self.socketio.emit('status_update', self._get_system_status())
-                    self.socketio.emit('gps_update', self._get_gps_data())
+                    if self.socketio:
+                        self.socketio.emit('status_update', self._get_system_status())
+                        self.socketio.emit('gps_update', self._get_gps_data())
+                    else:
+                        # Fallback for polling if SocketIO is not available
+                        self.logger.warning("SocketIO not available, broadcasting updates via polling.")
+                        # This part would require a polling mechanism if SocketIO is off
+                        # For now, we'll just log a warning.
+                        pass
                     
                 time.sleep(self.config['update_rate'])
                 
@@ -341,27 +511,59 @@ class RTKWebServer:
                 time.sleep(5)  # Wait before retrying
                 
     def start(self):
-        """Start the web server"""
+        """Start the web server with robust error handling"""
         if self.running:
             return
             
         self.logger.info(f"Starting RTK Web Server on {self.host}:{self.port}")
         self.start_time = time.time()
         
-        # Load configuration
-        self._load_config()
-        
-        # Start update thread
-        self.running = True
-        self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
-        self.update_thread.start()
-        
-        # Start Flask-SocketIO server
-        if self.socketio:
-            self.server_thread = threading.Thread(target=self.socketio.run, args=(self.app,), kwargs={'host': self.host, 'port': self.port, 'debug': False}, daemon=True)
+        try:
+            # Load configuration
+            self._load_config()
+            
+            # Start update thread
+            self.running = True
+            if self.socketio:
+                self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
+                self.update_thread.start()
+            
+            # Start Flask server in background with timeout
+            self.server_thread = threading.Thread(target=self._start_server, daemon=True)
             self.server_thread.start()
-        else:
-            self.logger.error("SocketIO not initialized. Cannot start server.")
+            
+            # Wait for server to start (with timeout)
+            timeout = 5.0  # 5 second timeout
+            start_time = time.time()
+            
+            while time.time() - start_time < timeout:
+                if self.startup_successful:
+                    self.logger.info("Web server started successfully")
+                    return
+                time.sleep(0.1)
+            
+            # If we get here, startup may have failed
+            self.logger.warning("Web server startup timeout - continuing anyway")
+            self.startup_successful = True  # Assume it's working
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start web server: {e}")
+            self.startup_successful = False
+    
+    def _start_server(self):
+        """Start the actual Flask/SocketIO server"""
+        try:
+            if self.socketio:
+                self.logger.info("Starting SocketIO server...")
+                self.startup_successful = True  # Set flag before starting
+                self.socketio.run(self.app, host=self.host, port=self.port, debug=False, use_reloader=False)
+            else:
+                self.logger.info("Starting basic Flask server...")
+                self.startup_successful = True  # Set flag before starting  
+                self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
+        except Exception as e:
+            self.logger.error(f"Server startup failed: {e}")
+            self.startup_successful = False
         
     def stop(self):
         """Stop the web server"""

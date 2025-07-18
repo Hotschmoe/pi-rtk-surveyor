@@ -192,10 +192,20 @@ class PiRTKBootloader:
         
         if event_type == ButtonEvent.PRESS:
             if button == ButtonType.KEY1:
+                # Show immediate feedback that base mode was selected
+                if self.oled:
+                    self.oled.show_base_init_screen("Starting", "BASE STATION Selected")
+                time.sleep(1.0)
+                
                 self.selected_mode = "base"
                 self.mode_selected = True
                 self.logger.info("BASE STATION mode selected")
             elif button == ButtonType.KEY2:
+                # Show immediate feedback that rover mode was selected
+                if self.oled:
+                    self.oled.show_rover_init_screen("Starting", "ROVER Selected")
+                time.sleep(1.0)
+                
                 self.selected_mode = "rover"
                 self.mode_selected = True
                 self.logger.info("ROVER mode selected")
