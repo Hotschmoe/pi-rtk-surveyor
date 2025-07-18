@@ -161,13 +161,29 @@ class RTKBaseStation:
             if self.oled:
                 self.oled.show_base_init_screen("2/3", "Starting Web Server...")
             
-            # Start web server in background thread
-            web_thread = threading.Thread(target=self._start_web_server, daemon=True)
-            web_thread.start()
-            time.sleep(3)  # Give web server time to start
-            
-            self.webserver_running = True
-            self.logger.info("Web server started")
+            # Start web server in background thread with error handling
+            self.logger.info("Starting web server...")
+            try:
+                web_thread = threading.Thread(target=self._start_web_server, daemon=True)
+                web_thread.start()
+                
+                # Give web server time to start, but don't wait forever
+                start_time = time.time()
+                timeout = 10  # 10 second timeout
+                
+                while time.time() - start_time < timeout:
+                    if self.webserver_running or not web_thread.is_alive():
+                        break
+                    time.sleep(0.5)
+                
+                if self.webserver_running:
+                    self.logger.info("Web server started successfully")
+                else:
+                    self.logger.warning("Web server may not have started properly, continuing...")
+                    
+            except Exception as e:
+                self.logger.error(f"Web server startup error: {e}")
+                self.webserver_running = False
             
             # Step 3: Initialize WiFi hotspot (placeholder)
             if self.oled:
@@ -189,7 +205,12 @@ class RTKBaseStation:
         """Start the web server in background thread"""
         try:
             if self.web_server:
+                self.logger.info("Web server thread starting...")
+                self.webserver_running = True  # Set flag before starting
                 self.web_server.start()
+            else:
+                self.logger.error("Web server not initialized")
+                self.webserver_running = False
         except Exception as e:
             self.logger.error(f"Web server failed to start: {e}")
             self.webserver_running = False

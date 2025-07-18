@@ -57,17 +57,34 @@ class RTKWebServer:
         self.system_monitor = system_monitor
         self.battery_monitor = battery_monitor
         
-        # Flask app setup
+        # Check if template and static directories exist
+        template_dir = Path(__file__).parent / 'templates'
+        static_dir = Path(__file__).parent / 'static'
+        
+        # Create directories if they don't exist
+        template_dir.mkdir(exist_ok=True)
+        static_dir.mkdir(exist_ok=True)
+        
+        # Flask app setup with fallback for missing templates
         self.app = Flask(__name__, 
-                        template_folder='templates',
-                        static_folder='static')
+                        template_folder=str(template_dir),
+                        static_folder=str(static_dir))
         self.app.config['SECRET_KEY'] = 'pi-rtk-surveyor-secret'
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*")
+        
+        # Disable Flask's default logger to reduce noise
+        logging.getLogger('werkzeug').setLevel(logging.WARNING)
+        
+        try:
+            self.socketio = SocketIO(self.app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+        except Exception as e:
+            self.logger.error(f"Failed to initialize SocketIO: {e}")
+            self.socketio = None
         
         # Server state
         self.running = False
         self.update_thread = None
         self.connected_clients = set()
+        self.server_thread = None
         
         # Data storage
         self.position_history = []
@@ -155,6 +172,10 @@ class RTKWebServer:
             
     def _setup_socketio_events(self):
         """Setup SocketIO events for real-time updates"""
+        
+        if not self.socketio:
+            self.logger.warning("SocketIO not available, skipping event setup")
+            return
         
         @self.socketio.on('connect')
         def handle_connect():
@@ -336,7 +357,11 @@ class RTKWebServer:
         self.update_thread.start()
         
         # Start Flask-SocketIO server
-        self.socketio.run(self.app, host=self.host, port=self.port, debug=False)
+        if self.socketio:
+            self.server_thread = threading.Thread(target=self.socketio.run, args=(self.app,), kwargs={'host': self.host, 'port': self.port, 'debug': False}, daemon=True)
+            self.server_thread.start()
+        else:
+            self.logger.error("SocketIO not initialized. Cannot start server.")
         
     def stop(self):
         """Stop the web server"""
