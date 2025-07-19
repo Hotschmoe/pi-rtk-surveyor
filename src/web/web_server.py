@@ -556,11 +556,11 @@ class RTKWebServer:
             if self.socketio:
                 self.logger.info("Starting SocketIO server...")
                 self.startup_successful = True  # Set flag before starting
-                self.socketio.run(self.app, host=self.host, port=self.port, debug=False, use_reloader=False)
+                self.socketio.run(self.app, host=self.host, port=self.port, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
             else:
                 self.logger.info("Starting basic Flask server...")
                 self.startup_successful = True  # Set flag before starting  
-                self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
+                self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
         except Exception as e:
             self.logger.error(f"Server startup failed: {e}")
             self.startup_successful = False
