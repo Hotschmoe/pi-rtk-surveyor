@@ -145,19 +145,25 @@ class GPIOManager:
                     self.logger.debug(f"Pin {pin} already allocated to '{component_name}'")
                     return True
             
-            # Check against reserved pins, but allow button manager to override
+            # Check against reserved pins, but allow HAT usage to override
             if pin in self.RESERVED_PINS:
                 reserved_for = self.RESERVED_PINS[pin]
                 if mode == PinMode.SPI and "SPI" in reserved_for:
                     pass  # SPI pins can be used for SPI
                 elif mode == PinMode.I2C and "I2C" in reserved_for:
                     pass  # I2C pins can be used for I2C
+                elif mode == PinMode.UART and "UART" in reserved_for:
+                    pass  # UART pins can be used for UART
                 elif component_name == "button_manager" and pin in self.BUTTON_PINS:
                     # Allow button manager to override reserved status for button pins
                     self.logger.debug(f"Pin {pin} reserved for {reserved_for} but allowing button override")
                     pass
+                elif component_name in ["oled_manager", "gps_controller"] and ("SPI" in reserved_for or "UART" in reserved_for):
+                    # Allow HAT components to use their intended pins
+                    self.logger.debug(f"Pin {pin} reserved for {reserved_for} but allowing HAT component {component_name}")
+                    pass
                 else:
-                    self.logger.warning(f"Pin {pin} is reserved for {reserved_for} but requested for {mode.value}")
+                    self.logger.debug(f"Pin {pin} is reserved for {reserved_for} but requested for {mode.value} by {component_name}")
             
             # Configure the pin
             if not self._configure_pin(pin, mode, pull):
