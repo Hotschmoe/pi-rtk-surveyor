@@ -709,24 +709,26 @@ class PiRTKSurveyor:
             # Attempt to initialize with LC29H hardware on UART
             self.logger.info("Initializing LC29H GNSS controller for production hardware...")
             
-            # Try common UART ports for LC29H RTK HAT
+            # Try common UART ports and baud rates for LC29H RTK HAT
             uart_ports = ['/dev/ttyAMA0', '/dev/serial0', '/dev/ttyS0']
+            baud_rates = [38400, 9600, 115200, 57600, 19200]
             
             for port in uart_ports:
-                try:
-                    self.logger.info(f"Attempting GPS connection on {port}")
-                    gps = LC29HController(port=port, baudrate=38400, simulate=False)
-                    
-                    # Test connection
-                    if gps.connect():
-                        self.logger.info(f"Successfully connected to LC29H on {port}")
-                        return gps
-                    else:
-                        self.logger.warning(f"Failed to connect to GPS on {port}")
+                for baud in baud_rates:
+                    try:
+                        self.logger.info(f"Attempting GPS connection on {port} at {baud} baud")
+                        gps = LC29HController(port=port, baudrate=baud, simulate=False)
                         
-                except Exception as e:
-                    self.logger.warning(f"GPS connection error on {port}: {e}")
-                    continue
+                        # Test connection
+                        if gps.connect():
+                            self.logger.info(f"Successfully connected to LC29H on {port} at {baud} baud")
+                            return gps
+                        else:
+                            self.logger.debug(f"No response on {port} at {baud} baud")
+                            
+                    except Exception as e:
+                        self.logger.debug(f"GPS connection error on {port} at {baud}: {e}")
+                        continue
             
             # If we get here, no GPS hardware was detected
             self.logger.error("No LC29H GNSS hardware detected on any UART port")

@@ -153,14 +153,25 @@ class LC29HController:
                     )
                     
                     # Test connection by reading some data
-                    time.sleep(2)  # Allow GPS to send data
-                    if self.serial_connection.in_waiting > 0:
-                        test_data = self.serial_connection.read(self.serial_connection.in_waiting)
+                    self.logger.info(f"Testing GPS connection on {port} at {self.baudrate} baud...")
+                    time.sleep(3)  # Allow more time for GPS to send data
+                    
+                    bytes_waiting = self.serial_connection.in_waiting
+                    self.logger.debug(f"Bytes waiting on {port}: {bytes_waiting}")
+                    
+                    if bytes_waiting > 0:
+                        test_data = self.serial_connection.read(bytes_waiting)
+                        self.logger.debug(f"Raw data from {port}: {test_data[:100]}")  # Show first 100 bytes
+                        
                         if b'$' in test_data:  # NMEA sentences start with $
                             self.port = port
                             self.connected = True
-                            self.logger.info(f"Successfully connected to GPS on {port}")
+                            self.logger.info(f"Successfully connected to GPS on {port} - NMEA data detected")
                             return True
+                        else:
+                            self.logger.warning(f"Data received on {port} but no NMEA sentences detected")
+                    else:
+                        self.logger.warning(f"No data received on {port} after 3 seconds")
                     
                     self.serial_connection.close()
                     

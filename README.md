@@ -45,6 +45,8 @@ Build your own professional-grade RTK surveying station using a Raspberry Pi. Ac
 - External GPS antenna for better reception
 - Solar panel for extended operation
 
+> **⚠️ Important**: Bluetooth must be disabled during setup to free the UART for GPS communication. The installation process handles this automatically.
+
 ## 🚀 Quick Start
 
 ### 1. Hardware Assembly
@@ -64,10 +66,14 @@ cd pi-rtk-surveyor
 # Run setup script
 chmod +x setup.sh
 ./setup.sh
-```
-or
-```bash
-bash setup.sh
+
+# CRITICAL: Disable Bluetooth to free UART for GPS
+sudo bash -c 'echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt'
+sudo systemctl disable hciuart.service
+sudo systemctl disable bluetooth.service
+
+# Reboot to apply all changes
+sudo reboot
 ```
 
 

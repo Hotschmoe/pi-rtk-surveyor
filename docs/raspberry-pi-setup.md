@@ -76,6 +76,27 @@ sudo i2cdetect -y 1
 ls -la /dev/spi*
 ```
 
+### Step 2b: CRITICAL - Disable Bluetooth for GPS
+
+**The LC29H GPS module requires exclusive access to the Pi's UART.** By default, Raspberry Pi OS assigns the main UART to Bluetooth, which prevents GPS communication.
+
+```bash
+# Disable Bluetooth to free UART for GPS
+sudo bash -c 'echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt'
+sudo systemctl disable hciuart.service
+sudo systemctl disable bluetooth.service
+
+# Verify UART is available after reboot
+ls -la /dev/tty* | grep -E "(AMA|serial)"
+# Should show /dev/ttyAMA0 after reboot
+```
+
+**Why this is necessary:**
+- LC29H GPS HAT communicates via UART (pins 8/10)
+- Pi OS uses this UART for Bluetooth by default  
+- GPS cannot function while Bluetooth claims the UART
+- Disabling Bluetooth frees the UART for GPS exclusive use
+
 ### Step 3: Service Management
 
 After installation, the Pi RTK Surveyor runs as a systemd service:
@@ -202,7 +223,26 @@ Example configuration:
 
 ### Common Issues
 
-#### 1. OLED Display Not Working
+#### 1. GPS Module Not Detected
+```bash
+# Check if UART devices exist
+ls -la /dev/tty* | grep -E "(AMA|serial)"
+# Should show /dev/ttyAMA0 if properly configured
+
+# Check if Bluetooth is disabled
+dmesg | grep -i uart
+# Should NOT show "hci_uart_bcm" if Bluetooth properly disabled
+
+# Test UART directly
+sudo cat /dev/ttyAMA0
+# Should show NMEA sentences starting with $ if GPS working
+
+# If no UART devices, add to /boot/firmware/config.txt:
+echo "enable_uart=1" | sudo tee -a /boot/firmware/config.txt
+echo "dtoverlay=disable-bt" | sudo tee -a /boot/firmware/config.txt
+```
+
+#### 2. OLED Display Not Working
 ```bash
 # Check SPI is enabled
 ls -la /dev/spi*

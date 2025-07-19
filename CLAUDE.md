@@ -35,6 +35,14 @@ The codebase uses a simplified, integrated architecture:
 sudo raspi-config
 # Interface Options > SPI > Enable
 # Interface Options > I2C > Enable
+
+# CRITICAL: Disable Bluetooth to free UART for GPS
+sudo bash -c 'echo "dtoverlay=disable-bt" >> /boot/firmware/config.txt'
+sudo systemctl disable hciuart.service
+sudo systemctl disable bluetooth.service
+
+# Reboot to apply all changes
+sudo reboot
 ```
 
 ### Running the Application
@@ -74,12 +82,17 @@ This project is designed for real hardware testing only - no simulation modes:
 - LC29H GNSS RTK HAT for GPS functionality
 - Waveshare 1.3" OLED HAT for display and button controls
 - Requires SPI and I2C interfaces enabled
+- **CRITICAL**: Bluetooth must be disabled to free UART for GPS communication
 
 ### GPIO Pin Allocations
+- **UART** for LC29H GPS (pins 8/10 - TXD/RXD)
 - SPI for OLED display (pins 19, 23, 24 + GPIO 24, 25)
 - I2C for additional sensors
 - GPIO pins 21, 20, 16 for buttons (KEY1, KEY2, KEY3)
 - Joystick on GPIO pins 6, 19, 5, 26, 13
+
+### UART Configuration Requirements
+The LC29H GPS module requires exclusive access to the Pi's main UART (/dev/ttyAMA0). By default, Raspberry Pi OS assigns this UART to Bluetooth, which prevents GPS communication. The system automatically disables Bluetooth during setup to ensure GPS functionality.
 
 ## Key Files to Understand
 
@@ -253,6 +266,18 @@ python3 src/main.py --log-level DEBUG
 # Check data files
 ls -la data/surveys/
 cat data/surveys/latest_survey.csv
+
+# Troubleshooting GPS connection
+# Check if UART devices exist
+ls -la /dev/tty* | grep -E "(AMA|serial)"
+
+# Check if Bluetooth is disabled
+dmesg | grep -i uart
+# Should NOT show "hci_uart_bcm" if Bluetooth is properly disabled
+
+# Test UART directly
+sudo cat /dev/ttyAMA0
+# Should show NMEA sentences starting with $ if GPS is working
 ```
 
 ## Testing Philosophy
