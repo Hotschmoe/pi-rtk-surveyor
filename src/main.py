@@ -89,9 +89,13 @@ class PiRTKSurveyor:
             self.button_api = ButtonAPI(app_context=self)
             self.logger.info("Button API initialized")
             
-            # Initialize GPS controller (basic init only)
-            self.gps_controller = LC29HController()
-            self.logger.info("GPS controller initialized")
+            # Initialize GPS controller with hardware detection
+            self.gps_controller = self._initialize_gps_controller()
+            if self.gps_controller:
+                self.logger.info("GPS controller initialized successfully")
+            else:
+                self.logger.error("Failed to initialize GPS controller")
+                return False
             
             # Show GPIO pin allocations
             pin_info = self.gpio_manager.get_pin_info()
@@ -119,8 +123,13 @@ class PiRTKSurveyor:
         if self.button_api:
             self.button_api.start()
         
+        # Start GPS controller if available
         if self.gps_controller:
-            self.gps_controller.start()
+            if self.gps_controller.start():
+                self.logger.info("GPS data acquisition started")
+            else:
+                self.logger.error("Failed to start GPS data acquisition")
+                return 1
         
         # Show splash screen
         if self.oled:
@@ -560,27 +569,59 @@ class PiRTKSurveyor:
             self.logger.info(f"  Position: {self.current_position.latitude:.6f}, {self.current_position.longitude:.6f}")
     
     def _log_survey_point(self):
-        """Log a survey point"""
-        if not self.point_logging_ready:
-            self.logger.warning("Point logging not ready - insufficient GPS accuracy")
+        """Log a survey point (production hardware only)"""
+        # Check if GPS hardware is available
+        if not self.gps_controller or not self.gps_controller.connected:
+            self.logger.error("Cannot log point - GPS hardware not available")
+            if self.oled:
+                self.oled.show_rover_init_screen("Error", "GPS Hardware Required")
+                time.sleep(2.0)
             return
         
-        if not self.current_position:
-            self.logger.warning("No GPS position available for logging")
+        # Check if GPS has sufficient accuracy for surveying
+        if not self.point_logging_ready:
+            self.logger.warning("Point logging not ready - insufficient GPS accuracy")
+            self.logger.warning(f"Current RTK status: {self.rtk_status}")
+            if self.oled:
+                self.oled.show_rover_init_screen("Wait", f"Need RTK Fix: {self.rtk_status}")
+                time.sleep(2.0)
+            return
+        
+        # Check if we have a valid position
+        if not self.current_position or not self.current_position.valid:
+            self.logger.warning("No valid GPS position available for logging")
             return
         
         try:
             self.points_logged += 1
             
-            self.logger.info(f"Survey point {self.points_logged} logged:")
-            self.logger.info(f"  Position: {self.current_position.latitude:.6f}, {self.current_position.longitude:.6f}")
+            # Log detailed point information
+            self.logger.info(f"=== Survey Point {self.points_logged} ===")
+            self.logger.info(f"  Latitude:  {self.current_position.latitude:.8f}")
+            self.logger.info(f"  Longitude: {self.current_position.longitude:.8f}")
+            self.logger.info(f"  Elevation: {self.current_position.elevation:.3f}m")
             self.logger.info(f"  RTK Status: {self.rtk_status}")
+            self.logger.info(f"  Fix Type: {self.current_position.fix_type.name}")
+            self.logger.info(f"  Satellites: {self.current_position.satellites_used}")
+            self.logger.info(f"  HDOP: {self.current_position.hdop:.2f}")
+            self.logger.info(f"  Horizontal Accuracy: {self.current_position.accuracy_horizontal:.3f}m")
+            self.logger.info(f"  Vertical Accuracy: {self.current_position.accuracy_vertical:.3f}m")
             self.logger.info(f"  Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.logger.info("================================")
             
-            # TODO: Save to CSV file or database
+            # Show success feedback on display
+            if self.oled:
+                self.oled.show_rover_init_screen("Success", f"Point {self.points_logged} Logged!")
+                time.sleep(1.5)
+            
+            # TODO: Save to CSV file in data/surveys/ directory
+            # This will be implemented in Task 2: Point Logging System
             
         except Exception as e:
             self.logger.error(f"Failed to log survey point: {e}")
+            if self.oled:
+                self.oled.show_rover_init_screen("Error", "Point Log Failed")
+                time.sleep(2.0)
     
     # =================================================================
     # COMMON FUNCTIONALITY
@@ -590,35 +631,56 @@ class PiRTKSurveyor:
         """Update monitoring data from GPS and other sources"""
         try:
             # Update GPS satellite count and RTK status
-            if self.gps_controller:
+            if self.gps_controller and self.gps_controller.connected:
+                # Get current position from GPS
                 position = self.gps_controller.get_position()
-                if position and hasattr(position, 'satellites_used'):
+                
+                if position and position.valid:
                     self.satellites_count = position.satellites_used
                     self.current_position = position
-                else:
-                    self.satellites_count = 0
                     
-                # Update RTK status
-                if self.gps_controller.has_rtk_fix():
-                    self.rtk_status = "RTK Fixed"
-                    if self.current_mode == "rover":
-                        self.point_logging_ready = True
-                elif self.gps_controller.has_rtk_float():
-                    self.rtk_status = "RTK Float"
-                    if self.current_mode == "rover":
-                        self.point_logging_ready = True
+                    # Update RTK status based on fix type
+                    if self.gps_controller.has_rtk_fix():
+                        self.rtk_status = "RTK Fixed"
+                        if self.current_mode == "rover":
+                            self.point_logging_ready = True
+                    elif self.gps_controller.has_rtk_float():
+                        self.rtk_status = "RTK Float"
+                        if self.current_mode == "rover":
+                            self.point_logging_ready = True
+                    elif position.fix_type.value > 0:
+                        self.rtk_status = f"GPS {position.fix_type.name}"
+                        if self.current_mode == "rover":
+                            self.point_logging_ready = False
+                    else:
+                        self.rtk_status = "No Fix"
+                        if self.current_mode == "rover":
+                            self.point_logging_ready = False
                 else:
-                    self.rtk_status = "No RTK"
+                    # GPS connected but no valid position yet
+                    self.satellites_count = 0
+                    self.rtk_status = "Acquiring Signal"
                     if self.current_mode == "rover":
                         self.point_logging_ready = False
+                        
+                # Get GPS statistics for connection monitoring
+                stats = self.gps_controller.get_statistics()
+                if stats.get('time_since_last_message', 999) > 10:
+                    self.rtk_status = "GPS Timeout"
+                    
             else:
+                # GPS not available or not connected
                 self.satellites_count = 0
-                self.rtk_status = "GPS Offline"
+                self.rtk_status = "GPS Hardware Not Available"
+                if self.current_mode == "rover":
+                    self.point_logging_ready = False
             
         except Exception as e:
             self.logger.error(f"Monitoring data update error: {e}")
             self.satellites_count = 0
-            self.rtk_status = "Error"
+            self.rtk_status = "GPS Error"
+            if self.current_mode == "rover":
+                self.point_logging_ready = False
     
     def _format_uptime(self, uptime_seconds: float) -> str:
         """Format uptime in human readable format"""
@@ -640,6 +702,43 @@ class PiRTKSurveyor:
             
             self.oled.device.contrast(self.brightness_level)
             self.logger.info(f"Brightness adjusted to: {self.brightness_level}")
+    
+    def _initialize_gps_controller(self) -> Optional[LC29HController]:
+        """Initialize GPS controller with hardware detection (production mode only)"""
+        try:
+            # Attempt to initialize with LC29H hardware on UART
+            self.logger.info("Initializing LC29H GNSS controller for production hardware...")
+            
+            # Try common UART ports for LC29H RTK HAT
+            uart_ports = ['/dev/ttyAMA0', '/dev/serial0', '/dev/ttyS0']
+            
+            for port in uart_ports:
+                try:
+                    self.logger.info(f"Attempting GPS connection on {port}")
+                    gps = LC29HController(port=port, baudrate=38400, simulate=False)
+                    
+                    # Test connection
+                    if gps.connect():
+                        self.logger.info(f"Successfully connected to LC29H on {port}")
+                        return gps
+                    else:
+                        self.logger.warning(f"Failed to connect to GPS on {port}")
+                        
+                except Exception as e:
+                    self.logger.warning(f"GPS connection error on {port}: {e}")
+                    continue
+            
+            # If we get here, no GPS hardware was detected
+            self.logger.error("No LC29H GNSS hardware detected on any UART port")
+            self.logger.error("Please ensure:")
+            self.logger.error("  1. LC29H RTK HAT is properly connected")
+            self.logger.error("  2. UART is enabled in raspi-config")
+            self.logger.error("  3. Serial console is disabled")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"GPS controller initialization failed: {e}")
+            return None
     
     def cleanup(self):
         """Full cleanup of all resources"""
