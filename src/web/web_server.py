@@ -595,7 +595,7 @@ class RTKWebServer:
 # Standalone usage for development/testing
 if __name__ == '__main__':
     # Initialize with mock components for testing
-    from gnss.lc29h_controller import LC29HController
+    from common.lc29h_controller import LC29HController
     from monitoring.system_monitor import SystemMonitor
     
     gps = LC29HController(simulate=True)
