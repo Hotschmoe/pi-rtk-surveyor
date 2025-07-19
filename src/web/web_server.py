@@ -510,7 +510,7 @@ class RTKWebServer:
                 self.logger.error(f"Update loop error: {e}")
                 time.sleep(5)  # Wait before retrying
                 
-    def start(self):
+    def start(self, run_in_thread=True):
         """Start the web server with robust error handling"""
         if self.running:
             return
@@ -528,23 +528,27 @@ class RTKWebServer:
                 self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
                 self.update_thread.start()
             
-            # Start Flask server in background with timeout
-            self.server_thread = threading.Thread(target=self._start_server, daemon=True)
-            self.server_thread.start()
-            
-            # Wait for server to start (with timeout)
-            timeout = 5.0  # 5 second timeout
-            start_time = time.time()
-            
-            while time.time() - start_time < timeout:
-                if self.startup_successful:
-                    self.logger.info("Web server started successfully")
-                    return
-                time.sleep(0.1)
-            
-            # If we get here, startup may have failed
-            self.logger.warning("Web server startup timeout - continuing anyway")
-            self.startup_successful = True  # Assume it's working
+            if run_in_thread:
+                # Start Flask server in background with timeout
+                self.server_thread = threading.Thread(target=self._start_server, daemon=True)
+                self.server_thread.start()
+                
+                # Wait for server to start (with timeout)
+                timeout = 5.0  # 5 second timeout
+                start_time = time.time()
+                
+                while time.time() - start_time < timeout:
+                    if self.startup_successful:
+                        self.logger.info("Web server started successfully")
+                        return
+                    time.sleep(0.1)
+                
+                # If we get here, startup may have failed
+                self.logger.warning("Web server startup timeout - continuing anyway")
+                self.startup_successful = True  # Assume it's working
+            else:
+                # Run server directly in main thread (for standalone usage)
+                self._start_server()
             
         except Exception as e:
             self.logger.error(f"Failed to start web server: {e}")
@@ -604,6 +608,8 @@ if __name__ == '__main__':
     server = RTKWebServer(gps_controller=gps, system_monitor=system_mon)
     
     try:
-        server.start()
+        # Run server in main thread for standalone usage
+        server.start(run_in_thread=False)
     except KeyboardInterrupt:
+        print("\nShutting down server...")
         server.stop()
