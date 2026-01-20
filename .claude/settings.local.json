@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "start": [
+      {
+        "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/cstack-start.ps1",
+        "os": ["windows"]
+      },
+      {
+        "command": "bash .claude/hooks/cstack-start.sh",
+        "os": ["linux", "darwin"]
+      }
+    ],
+    "stop": [
+      {
+        "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/cstack-stop.ps1",
+        "os": ["windows"]
+      },
+      {
+        "command": "bash .claude/hooks/cstack-stop.sh",
+        "os": ["linux", "darwin"]
+      }
+    ]
+  }
+}
